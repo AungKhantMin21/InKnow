@@ -2,8 +2,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
 /** Build the interrogation system prompt for a specific employee and role */
 export const buildInterrogationSystemPrompt = (employeeName, roleName) =>
   `
@@ -60,8 +58,13 @@ NEVER:
  * history = array of { role: 'ai'|'employee', content: string }
  */
 export const sendInterrogationMessage = async (systemPrompt, history, newMessage) => {
-  const chat = chatModel.startChat({
+  // systemInstruction must be on getGenerativeModel, not startChat
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
     systemInstruction: systemPrompt,
+  });
+
+  const chat = model.startChat({
     history: history.map((msg) => ({
       role: msg.role === "ai" ? "model" : "user",
       parts: [{ text: msg.content }],
