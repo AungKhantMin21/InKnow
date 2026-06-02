@@ -62,6 +62,46 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// GET /api/sessions — list all sessions for the authenticated employee
+router.get("/", async (req, res, next) => {
+  try {
+    const { data: sessions, error } = await supabase
+      .from("interrogation_sessions")
+      .select("id, status, started_at, completed_at, roles(name)")
+      .eq("employee_id", req.employee.id)
+      .order("started_at", { ascending: false });
+
+    if (error) throw error;
+
+    if (!sessions.length) {
+      return res.json({ data: { sessions: [] }, error: null, message: null });
+    }
+
+    // Fetch message counts in one query
+    const ids = sessions.map((s) => s.id);
+    const { data: counts, error: countErr } = await supabase
+      .from("session_messages")
+      .select("session_id")
+      .in("session_id", ids);
+
+    if (countErr) throw countErr;
+
+    const countMap = counts.reduce((acc, m) => {
+      acc[m.session_id] = (acc[m.session_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const result = sessions.map((s) => ({
+      ...s,
+      message_count: countMap[s.id] || 0,
+    }));
+
+    res.json({ data: { sessions: result }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/sessions/:id — return session with all messages
 router.get("/:id", async (req, res, next) => {
   try {
