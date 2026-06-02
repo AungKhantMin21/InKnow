@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: #f8f7f4;
+  --white: #ffffff;
+  --ground: #f0eee9;
+  --rule: #e2ded6;
+  --rule-hi: #c8c3b8;
+  --ink: #131210;
+  --ink-2: #3d3b37;
+  --ink-3: #8c8980;
+  --ink-4: #bab7b0;
+  --volt: #2d4eff;
+  --volt-light: #eef1ff;
+  --forest: #1a6b45;
+  --forest-light: #e8f4ee;
+  --amber: #8b5200;
+  --amber-light: #fdf3e7;
+  --danger: #8b1a1a;
+  --danger-light: #fdf0f0;
+  --font-display: "Fraunces", serif;
+  --font-body: "Epilogue", sans-serif;
+  --font-mono: "DM Mono", monospace;
+}
+
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 200;
+  letter-spacing: -0.01em;
+}
+
+@keyframes diamondPulse {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(45deg) scale(0.7);
+    opacity: 0.55;
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes articleReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes captureIn {
+  from {
+    opacity: 0;
+    transform: translateX(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
