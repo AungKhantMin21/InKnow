@@ -90,7 +90,23 @@ export const sendInterrogationMessage = async (systemPrompt, history, newMessage
     ];
   }
 
-  const chat = model.startChat({ history: formattedHistory });
-  const result = await chat.sendMessage(newMessage);
-  return result.response.text();
+  // Extract retry delay from Gemini 429 error message, e.g. "retry in 29.2s"
+  const parseRetryDelay = (msg = "") => {
+    const match = msg.match(/retry in ([\d.]+)s/i);
+    return match ? Math.ceil(parseFloat(match[1])) * 1000 + 2000 : 35000;
+  };
+
+  const attempt = async () => {
+    const chat = model.startChat({ history: formattedHistory });
+    return (await chat.sendMessage(newMessage)).response.text();
+  };
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (err.status !== 429) throw err;
+    // Wait out the rate limit then retry once
+    await new Promise((r) => setTimeout(r, parseRetryDelay(err.message)));
+    return await attempt();
+  }
 };
