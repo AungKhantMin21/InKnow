@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth.jsx";
 
 const NAV_ITEMS = [
   { label: "Sessions", path: "/sessions" },
+  { label: "New session", path: "/sessions/new" },
   { label: "Knowledge", path: "/knowledge" },
   { label: "Copilot", path: "/copilot" },
 ];
@@ -84,7 +85,7 @@ const Dashboard = () => {
         {/* Quick actions */}
         <div className="flex items-center gap-4 mb-12">
           <button
-            onClick={() => navigate("/sessions")}
+            onClick={() => navigate("/sessions/new")}
             className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors"
           >
             Start a capture session
@@ -111,7 +112,7 @@ const Dashboard = () => {
               No knowledge captured yet.
             </p>
             <button
-              onClick={() => navigate("/sessions")}
+              onClick={() => navigate("/sessions/new")}
               className="mt-4 font-body font-medium text-xs text-volt hover:underline"
             >
               Start your first capture session →

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth.jsx";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Session from "./pages/Session.jsx";
+import SessionsList from "./pages/SessionsList.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -30,6 +31,14 @@ const AppRoutes = () => {
       />
       <Route
         path="/sessions"
+        element={
+          <ProtectedRoute>
+            <SessionsList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/sessions/new"
         element={
           <ProtectedRoute>
             <Session />

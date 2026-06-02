@@ -81,7 +81,7 @@ const Session = () => {
 
   // Create or load session
   useEffect(() => {
-    if (!id) {
+    if (!id || id === "new") {
       createSession()
         .then(({ data }) => {
           navigate(`/sessions/${data.data.session.id}`, { replace: true });
