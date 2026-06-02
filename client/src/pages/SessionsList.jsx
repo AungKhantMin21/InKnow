@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { listSessions } from "../lib/api.js";
+import Sidebar from "../components/ui/Sidebar.jsx";
 
 const STATUS_STYLE = {
   active: { color: "var(--amber)", bg: "var(--amber-light)", label: "Active" },
@@ -26,33 +27,7 @@ const SessionsList = () => {
 
   return (
     <div className="min-h-screen bg-surface flex" style={{ animation: "pageFade 200ms ease" }}>
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-rule flex flex-col flex-shrink-0">
-        <div className="px-6 py-6 border-b border-rule">
-          <span className="font-display font-light text-xl text-ink">In</span>
-          <span className="font-display font-light italic text-xl text-volt">Know</span>
-        </div>
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
-          {[
-            { label: "Dashboard", path: "/dashboard" },
-            { label: "Sessions", path: "/sessions", active: true },
-            { label: "Knowledge", path: "/knowledge" },
-            { label: "Copilot", path: "/copilot" },
-          ].map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={`w-full text-left px-3 py-2 font-body font-light text-sm transition-colors ${
-                item.active
-                  ? "bg-ground text-ink"
-                  : "text-ink-2 hover:bg-ground hover:text-ink"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
+      <Sidebar />
 
       {/* Main */}
       <main className="flex-1 px-12 py-12">

@@ -1,21 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.jsx";
-
-const NAV_ITEMS = [
-  { label: "Sessions", path: "/sessions" },
-  { label: "New session", path: "/sessions/new" },
-  { label: "Knowledge", path: "/knowledge" },
-  { label: "Copilot", path: "/copilot" },
-];
+import Sidebar from "../components/ui/Sidebar.jsx";
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
 
   const hour = new Date().getHours();
   const greeting =
@@ -23,49 +12,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-surface flex" style={{ animation: "pageFade 200ms ease" }}>
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-rule flex flex-col flex-shrink-0">
-        {/* Wordmark */}
-        <div className="px-6 py-6 border-b border-rule">
-          <span className="font-display font-light text-xl text-ink">In</span>
-          <span className="font-display font-light italic text-xl text-volt">Know</span>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="w-full text-left px-3 py-2 font-body font-light text-sm text-ink-2 hover:bg-ground hover:text-ink transition-colors"
-            >
-              {item.label}
-            </button>
-          ))}
-          {user?.is_manager && (
-            <button
-              onClick={() => navigate("/manager")}
-              className="w-full text-left px-3 py-2 font-body font-light text-sm text-ink-2 hover:bg-ground hover:text-ink transition-colors"
-            >
-              Manager
-            </button>
-          )}
-        </nav>
-
-        {/* User footer */}
-        <div className="px-6 py-4 border-t border-rule">
-          <p className="font-body font-light text-xs text-ink-2 truncate">{user?.name}</p>
-          <p className="font-mono text-[9px] tracking-wider text-ink-4 truncate mt-0.5">
-            {user?.roles?.name || ""}
-          </p>
-          <button
-            onClick={handleLogout}
-            className="mt-3 font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
-          >
-            Sign out
-          </button>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* Main */}
       <main className="flex-1 px-12 py-12">
