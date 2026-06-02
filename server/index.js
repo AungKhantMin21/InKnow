@@ -4,6 +4,7 @@ import cors from "cors";
 import supabase from "./db/supabase.js";
 import authRoutes from "./routes/auth.js";
 import rolesRoutes from "./routes/roles.js";
+import sessionsRoutes from "./routes/sessions.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
@@ -18,6 +19,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/roles", rolesRoutes);
+app.use("/api/sessions", sessionsRoutes);
 
 app.use(errorHandler);
 
