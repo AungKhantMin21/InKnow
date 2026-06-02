@@ -64,13 +64,22 @@ export const sendInterrogationMessage = async (systemPrompt, history, newMessage
     systemInstruction: systemPrompt,
   });
 
-  const chat = model.startChat({
-    history: history.map((msg) => ({
-      role: msg.role === "ai" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    })),
-  });
+  let formattedHistory = history.map((msg) => ({
+    role: msg.role === "ai" ? "model" : "user",
+    parts: [{ text: msg.content }],
+  }));
 
+  // Gemini requires history to start with a user turn. The session opening
+  // message is an AI turn with no preceding user message, so inject the
+  // synthetic trigger that was used when the session was created.
+  if (formattedHistory.length > 0 && formattedHistory[0].role === "model") {
+    formattedHistory = [
+      { role: "user", parts: [{ text: "begin" }] },
+      ...formattedHistory,
+    ];
+  }
+
+  const chat = model.startChat({ history: formattedHistory });
   const result = await chat.sendMessage(newMessage);
   return result.response.text();
 };
