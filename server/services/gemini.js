@@ -105,8 +105,9 @@ export const sendInterrogationMessage = async (systemPrompt, history, newMessage
     return await attempt();
   } catch (err) {
     if (err.status !== 429) throw err;
-    // Wait out the rate limit then retry once
-    await new Promise((r) => setTimeout(r, parseRetryDelay(err.message)));
+    const delay = parseRetryDelay(err.message);
+    console.error(`[GEMINI] Rate limited — retrying in ${delay / 1000}s`);
+    await new Promise((r) => setTimeout(r, delay));
     return await attempt();
   }
 };
