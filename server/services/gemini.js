@@ -60,7 +60,7 @@ NEVER:
 export const sendInterrogationMessage = async (systemPrompt, history, newMessage) => {
   // systemInstruction must be on getGenerativeModel, not startChat
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash-lite",
     systemInstruction: systemPrompt,
   });
 
