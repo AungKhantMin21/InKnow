@@ -20,6 +20,7 @@ export const getMe = () => api.get("/api/auth/me");
 export const getRoles = () => api.get("/api/roles");
 
 // Sessions
+export const listSessions = () => api.get("/api/sessions");
 export const createSession = () => api.post("/api/sessions");
 export const getSession = (id) => api.get(`/api/sessions/${id}`);
 export const sendMessage = (id, content) =>
