@@ -69,6 +69,17 @@ export const sendInterrogationMessage = async (systemPrompt, history, newMessage
     parts: [{ text: msg.content }],
   }));
 
+  // Merge consecutive same-role turns — Gemini requires strictly alternating turns.
+  const merged = [];
+  for (const turn of formattedHistory) {
+    if (merged.length > 0 && merged[merged.length - 1].role === turn.role) {
+      merged[merged.length - 1].parts[0].text += "\n" + turn.parts[0].text;
+    } else {
+      merged.push(turn);
+    }
+  }
+  formattedHistory = merged;
+
   // Gemini requires history to start with a user turn. The session opening
   // message is an AI turn with no preceding user message, so inject the
   // synthetic trigger that was used when the session was created.

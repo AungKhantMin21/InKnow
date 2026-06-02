@@ -129,14 +129,8 @@ router.post("/:id/message", async (req, res, next) => {
       });
     }
 
-    const { data: empMsg, error: empMsgErr } = await supabase
-      .from("session_messages")
-      .insert({ session_id: session.id, role: "employee", content: content.trim() })
-      .select()
-      .single();
-
-    if (empMsgErr) throw empMsgErr;
-
+    // Load existing history BEFORE saving the new employee message.
+    // This way a Gemini failure never leaves an orphaned employee message in the DB.
     const { data: history, error: histErr } = await supabase
       .from("session_messages")
       .select("role, content")
@@ -150,13 +144,20 @@ router.post("/:id/message", async (req, res, next) => {
       session.employees.roles.name,
     );
 
-    // Pass history excluding the message we just saved (already included as newMessage)
-    const historyWithoutLast = history.slice(0, -1);
     const aiText = await sendInterrogationMessage(
       systemPrompt,
-      historyWithoutLast,
+      history,
       content.trim(),
     );
+
+    // Gemini succeeded — now persist both messages
+    const { data: empMsg, error: empMsgErr } = await supabase
+      .from("session_messages")
+      .insert({ session_id: session.id, role: "employee", content: content.trim() })
+      .select()
+      .single();
+
+    if (empMsgErr) throw empMsgErr;
 
     const { data: aiMsg, error: aiMsgErr } = await supabase
       .from("session_messages")
