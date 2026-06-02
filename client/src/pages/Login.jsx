@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth.js";
+import { useAuth } from "../hooks/useAuth.jsx";
 import { getRoles } from "../lib/api.js";
 
 const Login = () => {
