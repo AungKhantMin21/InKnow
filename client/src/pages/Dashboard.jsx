@@ -11,7 +11,10 @@ const Dashboard = () => {
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="min-h-screen bg-surface flex" style={{ animation: "pageFade 200ms ease" }}>
+    <div
+      className="min-h-screen bg-surface flex"
+      style={{ animation: "pageFade 200ms ease" }}
+    >
       <Sidebar />
 
       {/* Main */}
@@ -41,7 +44,7 @@ const Dashboard = () => {
             onClick={() => navigate("/copilot")}
             className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors"
           >
-            Ask the copilot
+            Ask Inno
           </button>
         </div>
 
