@@ -144,8 +144,13 @@ const Session = () => {
 
   const handleComplete = async () => {
     try {
-      await completeSession(id);
-      navigate(`/session-complete/${id}`);
+      const { data } = await completeSession(id);
+      navigate(`/session-complete/${id}`, {
+        state: {
+          articles: data.data.articles,
+          roleId: session?.role_id,
+        },
+      });
     } catch {
       setError("Something went wrong — try again.");
     }

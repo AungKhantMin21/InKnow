@@ -4,6 +4,8 @@ import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Session from "./pages/Session.jsx";
 import SessionsList from "./pages/SessionsList.jsx";
+import SessionComplete from "./pages/SessionComplete.jsx";
+import ArticleReview from "./pages/ArticleReview.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -50,6 +52,22 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Session />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/session-complete/:id"
+        element={
+          <ProtectedRoute>
+            <SessionComplete />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/session-complete/:id/review"
+        element={
+          <ProtectedRoute>
+            <ArticleReview />
           </ProtectedRoute>
         }
       />
