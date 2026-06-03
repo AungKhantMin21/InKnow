@@ -53,6 +53,46 @@ NEVER:
 - Sound like a form or an interview
 `.trim();
 
+/** Build the article generation prompt from a completed session conversation */
+export const buildArticleGenerationPrompt = (conversation, roleName) =>
+  `
+You have completed a knowledge capture conversation with a ${roleName}.
+
+CONVERSATION:
+${conversation}
+
+Generate structured knowledge articles from this conversation.
+Each article captures one distinct topic, process, or piece of knowledge.
+
+Return a JSON array only — no preamble, no markdown fences.
+
+Each article:
+{
+  "title":   "Specific title — e.g. Monthly Close: The 3pm Timeout Rule",
+  "summary": "One sentence describing what this article covers",
+  "content": "Full article in markdown. Include: overview, step-by-step where relevant, key contacts if mentioned, common mistakes, what to do when things go wrong. Write in second person.",
+  "tags":    ["relevant", "tags"]
+}
+
+Rules:
+- Generate 2 to 6 articles — split by distinct topic
+- Titles must be specific — never generic like "System Tips"
+- Content must use the specific details from the conversation
+- If something was mentioned but not fully explained, note it:
+  "Note: needs more detail — ask [name] directly"
+- Never invent information not present in the conversation
+- Return valid JSON array only
+`.trim();
+
+/** Generate knowledge articles from a completed session conversation */
+export const generateArticles = async (prompt) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const clean = text.replace(/```json\n?|```/g, "").trim();
+  return JSON.parse(clean);
+};
+
 /**
  * Send one message in an ongoing interrogation session.
  * history = array of { role: 'ai'|'employee', content: string }
