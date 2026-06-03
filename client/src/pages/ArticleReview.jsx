@@ -173,9 +173,25 @@ const ArticleReview = () => {
             Review articles
           </span>
           <div className="flex-1" />
-          <span className="font-mono text-[11px] text-ink-3">
-            Article <span className="font-medium text-ink">{currentIndex + 1}</span> of {total}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setCurrentIndex((i) => i - 1); setMode("preview"); setError(null); }}
+              disabled={currentIndex === 0 || mode === "edit"}
+              className="font-mono text-[11px] text-ink-3 hover:text-ink transition-colors disabled:opacity-20 disabled:cursor-default px-1"
+            >
+              ←
+            </button>
+            <span className="font-mono text-[11px] text-ink-3">
+              Article <span className="font-medium text-ink">{currentIndex + 1}</span> of {total}
+            </span>
+            <button
+              onClick={() => { setCurrentIndex((i) => i + 1); setMode("preview"); setError(null); }}
+              disabled={currentIndex === total - 1 || mode === "edit"}
+              className="font-mono text-[11px] text-ink-3 hover:text-ink transition-colors disabled:opacity-20 disabled:cursor-default px-1"
+            >
+              →
+            </button>
+          </div>
         </div>
         <div className="h-0.5 bg-rule">
           <div className="h-full bg-ink transition-all duration-300" style={{ width: `${progressPct}%` }} />
