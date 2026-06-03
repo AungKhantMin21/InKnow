@@ -107,6 +107,7 @@ const ArticleReview = () => {
   }
 
   const current = articles[currentIndex];
+  const prev = currentIndex > 0 ? articles[currentIndex - 1] : null;
   const next = articles[currentIndex + 1];
   const total = articles.length;
   const progressPct = ((currentIndex + 1) / total) * 100;
@@ -265,24 +266,48 @@ const ArticleReview = () => {
             </>
           )}
 
-          {/* Next article preview — preview mode only */}
-          {mode === "preview" && next && (
+          {/* Article navigation — preview mode only */}
+          {mode === "preview" && (prev || next) && (
             <div style={{ marginTop: 48 }}>
               <div className="h-px bg-rule mb-5" />
-              <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">
-                Next article
-              </span>
-              <button
-                onClick={() => { setCurrentIndex((i) => i + 1); setError(null); }}
-                className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
-              >
-                <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>
-                  {next.title}
-                </span>
-                <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
-                  {currentIndex + 2} of {total} →
-                </span>
-              </button>
+
+              {prev && (
+                <div className={next ? "mb-4" : ""}>
+                  <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">
+                    Previous article
+                  </span>
+                  <button
+                    onClick={() => { setCurrentIndex((i) => i - 1); setError(null); }}
+                    className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
+                  >
+                    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
+                      ← {currentIndex} of {total}
+                    </span>
+                    <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>
+                      {prev.title}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {next && (
+                <div>
+                  <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">
+                    Next article
+                  </span>
+                  <button
+                    onClick={() => { setCurrentIndex((i) => i + 1); setError(null); }}
+                    className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
+                  >
+                    <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>
+                      {next.title}
+                    </span>
+                    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
+                      {currentIndex + 2} of {total} →
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
