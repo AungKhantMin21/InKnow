@@ -113,6 +113,44 @@ export const generateArticles = async (prompt) => {
   }
 };
 
+/** Build the copilot RAG prompt from a question and retrieved articles */
+export const buildCopilotPrompt = (question, articles) =>
+  `
+You are InKnow's knowledge assistant. Answer using only the articles below.
+Do not use any outside information.
+
+KNOWLEDGE ARTICLES:
+${articles
+  .map(
+    (a, i) => `
+[Article ${i + 1}]
+Title: ${a.title}
+Content: ${a.content}
+Captured by: ${a.captured_by_name} · ${a.created_at}
+`,
+  )
+  .join("\n---\n")}
+
+QUESTION: ${question}
+
+Rules:
+- Answer directly and specifically
+- Use only information from the articles above
+- If articles partially answer: "The knowledge base has partial information on this..."
+- If no relevant information: "Nobody has captured this yet."
+- Never invent information
+- Keep answers concise: 2–4 sentences for simple questions, more for processes
+- End with: "Source: [Article title] · [Name]"
+  Multiple sources: list each on a new line
+`.trim();
+
+/** Answer a copilot question from retrieved article context */
+export const answerFromContext = async (prompt) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+};
+
 /**
  * Send one message in an ongoing interrogation session.
  * history = array of { role: 'ai'|'employee', content: string }
