@@ -108,3 +108,82 @@ h4 {
     opacity: 1;
   }
 }
+
+/* ── Tiptap editor ─────────────────────────────────────────────────── */
+.tiptap {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink-2);
+  outline: none;
+  min-height: 320px;
+  padding: 16px 0;
+}
+.tiptap h2 {
+  font-family: var(--font-display);
+  font-weight: 200;
+  font-size: 20px;
+  color: var(--ink);
+  margin: 28px 0 10px;
+  letter-spacing: -0.01em;
+}
+.tiptap h3 {
+  font-family: var(--font-display);
+  font-weight: 200;
+  font-size: 16px;
+  color: var(--ink);
+  margin: 20px 0 8px;
+}
+.tiptap p { margin-bottom: 14px; }
+.tiptap ul,
+.tiptap ol {
+  padding-left: 18px;
+  margin-bottom: 14px;
+}
+.tiptap li {
+  margin-bottom: 6px;
+  line-height: 1.65;
+}
+.tiptap strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ink-4);
+  font-style: italic;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* ── Article review toolbar ────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--rule);
+  margin-bottom: 4px;
+}
+.toolbar-btn {
+  background: none;
+  border: none;
+  padding: 5px 9px;
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all 150ms;
+}
+.toolbar-btn:hover { background: var(--ground); color: var(--ink); }
+.toolbar-btn.is-active { background: var(--ground); color: var(--ink); }
+.toolbar-sep {
+  width: 0.5px;
+  height: 18px;
+  background: var(--rule);
+  margin: 0 4px;
+  align-self: center;
+}
