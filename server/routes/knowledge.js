@@ -148,4 +148,71 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
+// POST /api/knowledge/update — save a new version of an existing article (author only)
+router.post("/update", async (req, res, next) => {
+  try {
+    const { article_id, title, content, update_reason, session_id } = req.body;
+
+    if (!article_id || !content?.trim()) {
+      return res.status(400).json({
+        data: null,
+        error: "Missing fields",
+        message: "We need this to continue.",
+      });
+    }
+
+    const { data: current, error: fetchErr } = await supabase
+      .from("knowledge_articles")
+      .select("*")
+      .eq("id", article_id)
+      .single();
+
+    if (fetchErr || !current) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    if (current.captured_by !== req.employee.id) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const newTitle = title?.trim() || current.title;
+    const embeddingText = [newTitle, current.summary, content.trim()].filter(Boolean).join(" ");
+    const embedding = await generateEmbedding(embeddingText);
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("knowledge_articles")
+      .update({
+        title: newTitle,
+        content: content.trim(),
+        update_reason: update_reason || null,
+        previous_content: current.content,
+        previous_title: current.title,
+        version: (current.version || 1) + 1,
+        approved: false,
+        approved_by: null,
+        approved_at: null,
+        embedding,
+        updated_at: new Date().toISOString(),
+        updated_from_session_id: session_id || null,
+      })
+      .eq("id", article_id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    res.json({ data: { article: updated }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
