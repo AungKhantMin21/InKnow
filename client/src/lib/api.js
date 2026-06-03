@@ -27,4 +27,7 @@ export const sendMessage = (id, content) =>
   api.post(`/api/sessions/${id}/message`, { content });
 export const completeSession = (id) => api.post(`/api/sessions/${id}/complete`);
 
+// Knowledge
+export const saveArticle = (data) => api.post("/api/knowledge", data);
+
 export default api;
