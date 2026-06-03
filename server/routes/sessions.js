@@ -4,6 +4,8 @@ import auth from "../middleware/auth.js";
 import {
   buildInterrogationSystemPrompt,
   sendInterrogationMessage,
+  buildArticleGenerationPrompt,
+  generateArticles,
 } from "../services/gemini.js";
 
 const router = Router();
@@ -218,12 +220,12 @@ router.post("/:id/message", async (req, res, next) => {
   }
 });
 
-// POST /api/sessions/:id/complete — mark session as completed
+// POST /api/sessions/:id/complete — mark session completed and generate articles
 router.post("/:id/complete", async (req, res, next) => {
   try {
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select()
+      .select("*, roles(name)")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -245,7 +247,28 @@ router.post("/:id/complete", async (req, res, next) => {
 
     if (updateErr) throw updateErr;
 
-    res.json({ data: { session: completed }, error: null, message: null });
+    const { data: messages, error: msgErr } = await supabase
+      .from("session_messages")
+      .select("role, content")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: true });
+
+    if (msgErr) throw msgErr;
+
+    const conversation = messages
+      .map((m) => `${m.role === "ai" ? "AI" : "Employee"}: ${m.content}`)
+      .join("\n\n");
+
+    let articles = [];
+    try {
+      const prompt = buildArticleGenerationPrompt(conversation, session.roles.name);
+      articles = await generateArticles(prompt);
+    } catch (genErr) {
+      // Non-fatal — session is still marked complete, articles will be empty
+      console.error("[ARTICLE GEN] Failed:", genErr.message?.slice(0, 200));
+    }
+
+    res.json({ data: { session: completed, articles }, error: null, message: null });
   } catch (err) {
     next(err);
   }
