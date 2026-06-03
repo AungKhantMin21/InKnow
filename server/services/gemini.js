@@ -84,6 +84,143 @@ Rules:
 - Return valid JSON array only
 `.trim();
 
+/** Format a message array into a readable conversation string */
+export const formatConversation = (messages) =>
+  messages
+    .map((m) => `${m.role === "ai" ? "Inno" : "Employee"}: ${m.content}`)
+    .join("\n\n");
+
+/** Generate a short working title from the first few exchanges */
+export const generateProvisionalTitle = async (conversation) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const prompt = `
+Read the start of this knowledge capture conversation and generate a short working title describing the topic so far.
+
+CONVERSATION SO FAR:
+${conversation}
+
+Rules:
+- 4 to 8 words maximum
+- Title case
+- Describe the actual topic being discussed
+- No punctuation at the end
+- If not enough context yet, use the most relevant words from what has been discussed
+
+Return the title only. Nothing else.
+`.trim();
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
+};
+
+/** Generate a final specific title for a completed session */
+export const generateSessionTitle = async (conversation) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const prompt = `
+Read this knowledge capture conversation and generate a short, specific title that describes what was actually discussed.
+
+CONVERSATION:
+${conversation}
+
+Rules:
+- 4 to 8 words maximum
+- Title case
+- Describe the specific topic, not the person or role
+- No punctuation at the end
+- Sound like a document title, not a sentence
+- Be specific — use the actual subject matter
+
+Good examples:
+"Monthly Inventory Close and Timeout Workarounds"
+"Refund Approval Process Above 500"
+"New Promotion Campaign Request Checklist"
+"Vendor Contact Priority and Escalation Steps"
+
+Bad examples:
+"IT Administrator Knowledge Session" — too generic
+"Knowledge Capture" — says nothing
+
+Return the title only. No quotes, no explanation.
+`.trim();
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
+};
+
+/** Diff new conversation messages against existing articles — returns new/updated/nothing_new */
+export const runKnowledgeDiff = async (existingArticles, newMessages) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const prompt = `
+You are a knowledge curator reviewing new conversation messages against an existing knowledge base. Your job is to think like a human — only update notes when something genuinely new or different is said. Ignore repetition and reconfirmation.
+
+EXISTING KNOWLEDGE ARTICLES:
+${existingArticles
+  .map(
+    (a, i) => `
+[Article ${i + 1}]
+ID: ${a.id}
+Title: ${a.title}
+Content: ${a.content}
+`,
+  )
+  .join("\n---\n")}
+
+NEW CONVERSATION MESSAGES (since last session completion):
+${newMessages}
+
+For each piece of information in the new messages, decide:
+
+1. TRULY NEW — does not exist in any current article
+   → Create a new article
+
+2. UPDATE — new messages describe a changed process, corrected fact, or important addition to an existing article
+   → Update that specific article
+   → Preserve everything still accurate
+   → Only change what actually changed
+   → Note the specific reason in one sentence
+
+3. REPETITION — confirms or restates what is already captured accurately
+   → Ignore entirely, no action
+
+Return a JSON object only. No preamble. No explanation.
+
+{
+  "new_articles": [
+    {
+      "title": "specific title",
+      "summary": "one sentence",
+      "content": "full markdown content",
+      "tags": ["tag1", "tag2"]
+    }
+  ],
+  "updated_articles": [
+    {
+      "id": "existing article uuid exactly as provided",
+      "title": "updated title if changed, else same as before",
+      "content": "full updated markdown content",
+      "update_reason": "one sentence — what changed and why"
+    }
+  ],
+  "nothing_new": false
+}
+
+If nothing genuinely new was captured:
+{
+  "new_articles": [],
+  "updated_articles": [],
+  "nothing_new": true
+}
+
+Never invent information.
+Never update an article unless new messages explicitly contain different or additional information about that specific topic.
+`.trim();
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const clean = text.replace(/```json\n?|```/g, "").trim();
+  const match = clean.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON object in diff response");
+  return JSON.parse(match[0]);
+};
+
 /** Generate knowledge articles from a completed session conversation */
 export const generateArticles = async (prompt) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
