@@ -153,6 +153,7 @@ const ArticleReview = () => {
         content: current.content,
         tags: current.tags,
       });
+      setSaving(false);
       advance();
     } catch {
       setError("Something went wrong — try again.");
