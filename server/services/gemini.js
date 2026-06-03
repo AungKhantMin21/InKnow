@@ -87,10 +87,30 @@ Rules:
 /** Generate knowledge articles from a completed session conversation */
 export const generateArticles = async (prompt) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  const clean = text.replace(/```json\n?|```/g, "").trim();
-  return JSON.parse(clean);
+
+  const parseRetryDelay = (msg = "") => {
+    const match = msg.match(/retry in ([\d.]+)s/i);
+    return match ? Math.ceil(parseFloat(match[1])) * 1000 + 2000 : 35000;
+  };
+
+  const attempt = async () => {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    const stripped = text.replace(/```json\n?|```/g, "").trim();
+    const match = stripped.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error(`No JSON array in response: ${stripped.slice(0, 200)}`);
+    return JSON.parse(match[0]);
+  };
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (err.status !== 429) throw err;
+    const delay = parseRetryDelay(err.message);
+    console.error(`[ARTICLE GEN] Rate limited — retrying in ${delay / 1000}s`);
+    await new Promise((r) => setTimeout(r, delay));
+    return await attempt();
+  }
 };
 
 /**

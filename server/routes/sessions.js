@@ -261,7 +261,7 @@ router.post("/:id/complete", async (req, res, next) => {
 
     let articles = [];
     try {
-      const prompt = buildArticleGenerationPrompt(conversation, session.roles.name);
+      const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
       articles = await generateArticles(prompt);
     } catch (genErr) {
       // Non-fatal — session is still marked complete, articles will be empty
