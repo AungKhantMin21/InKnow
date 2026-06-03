@@ -98,8 +98,8 @@ const ArticleReview = () => {
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <p className="font-body font-light text-sm text-ink-2 mb-4">No articles to review.</p>
-          <button onClick={() => navigate("/sessions")} className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors">
-            ← Back to sessions
+          <button onClick={() => navigate("/knowledge")} className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors">
+            ← Back to knowledge
           </button>
         </div>
       </div>
@@ -137,7 +137,7 @@ const ArticleReview = () => {
     if (currentIndex < total - 1) {
       setCurrentIndex((i) => i + 1);
     } else {
-      navigate("/sessions");
+      navigate("/knowledge");
     }
   };
 
@@ -167,8 +167,8 @@ const ArticleReview = () => {
       {/* Sticky header: topbar + progress bar */}
       <div className="sticky top-0 z-10">
         <div className="bg-white border-b border-rule flex items-center px-8 gap-4" style={{ height: 52 }}>
-          <button onClick={() => navigate("/sessions")} className="font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
-            ← Sessions
+          <button onClick={() => navigate("/knowledge")} className="font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
+            ← Knowledge
           </button>
           <div className="w-px h-4 bg-rule" />
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">

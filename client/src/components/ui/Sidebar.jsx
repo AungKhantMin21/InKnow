@@ -10,12 +10,14 @@ const NAV_ITEMS = [
 
 const isActive = (path, location) => {
   if (path === "/sessions") {
-    // Active for /sessions and /sessions/:id, but not /sessions/new
     return (
       location.pathname === "/sessions" ||
       (location.pathname.startsWith("/sessions/") &&
         location.pathname !== "/sessions/new")
     );
+  }
+  if (path === "/knowledge") {
+    return location.pathname.startsWith("/knowledge");
   }
   return location.pathname === path;
 };
