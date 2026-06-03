@@ -153,6 +153,7 @@ const Session = () => {
           articles: data.data.articles,
           generationFailed: data.data.generationFailed,
           roleId: session?.role_id,
+          roleName: user?.roles?.name,
         },
       });
     } catch {

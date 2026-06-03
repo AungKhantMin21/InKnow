@@ -23,6 +23,7 @@ const SessionComplete = () => {
   const navigate = useNavigate();
 
   const roleId = location.state?.roleId;
+  const roleName = location.state?.roleName;
 
   const [articles, setArticles] = useState(location.state?.articles || []);
   const [failed, setFailed] = useState(location.state?.generationFailed || false);
@@ -43,7 +44,7 @@ const SessionComplete = () => {
 
   const handleReview = () => {
     navigate(`/session-complete/${id}/review`, {
-      state: { articles, roleId, sessionId: id },
+      state: { articles, roleId, roleName, sessionId: id },
     });
   };
 
