@@ -6,6 +6,10 @@ import {
   sendInterrogationMessage,
   buildArticleGenerationPrompt,
   generateArticles,
+  generateSessionTitle,
+  generateProvisionalTitle,
+  runKnowledgeDiff,
+  formatConversation,
 } from "../services/gemini.js";
 
 const router = Router();
@@ -43,7 +47,6 @@ router.post("/", async (req, res, next) => {
       employee.roles.name,
     );
 
-    // Empty history — Gemini generates the opening question from the system prompt
     const openingText = await sendInterrogationMessage(systemPrompt, [], "begin");
 
     const { data: openingMsg, error: msgErr } = await supabase
@@ -64,12 +67,12 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// GET /api/sessions — list all sessions for the authenticated employee
+// GET /api/sessions — list sessions for the authenticated employee
 router.get("/", async (req, res, next) => {
   try {
     const { data: sessions, error } = await supabase
       .from("interrogation_sessions")
-      .select("id, status, started_at, completed_at, roles(name)")
+      .select("id, status, title, role_id, started_at, completed_at, last_completed_at, roles(name)")
       .eq("employee_id", req.employee.id)
       .order("started_at", { ascending: false });
 
@@ -79,7 +82,6 @@ router.get("/", async (req, res, next) => {
       return res.json({ data: { sessions: [] }, error: null, message: null });
     }
 
-    // Fetch message counts in one query
     const ids = sessions.map((s) => s.id);
     const { data: counts, error: countErr } = await supabase
       .from("session_messages")
@@ -136,6 +138,23 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+// GET /api/sessions/:id/articles — return all knowledge articles for this session
+router.get("/:id/articles", async (req, res, next) => {
+  try {
+    const { data: articles, error } = await supabase
+      .from("knowledge_articles")
+      .select("id, title, summary, version, approved, created_at, updated_at, captured_by")
+      .eq("session_id", req.params.id)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ data: { articles: articles || [] }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/sessions/:id/message — send employee message, get AI response
 router.post("/:id/message", async (req, res, next) => {
   try {
@@ -150,7 +169,7 @@ router.post("/:id/message", async (req, res, next) => {
 
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("id, role_id, employee_id, employees(name, roles(name))")
+      .select("id, status, role_id, employee_id, message_count, title, last_completion_message_id, employees(name, roles(name))")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -163,16 +182,6 @@ router.post("/:id/message", async (req, res, next) => {
       });
     }
 
-    if (session.status === "completed") {
-      return res.status(400).json({
-        data: null,
-        error: "Session completed",
-        message: "This session is already complete.",
-      });
-    }
-
-    // Load existing history BEFORE saving the new employee message.
-    // This way a Gemini failure never leaves an orphaned employee message in the DB.
     const { data: history, error: histErr } = await supabase
       .from("session_messages")
       .select("role, content")
@@ -192,7 +201,6 @@ router.post("/:id/message", async (req, res, next) => {
       content.trim(),
     );
 
-    // Gemini succeeded — now persist both messages
     const { data: empMsg, error: empMsgErr } = await supabase
       .from("session_messages")
       .insert({ session_id: session.id, role: "employee", content: content.trim() })
@@ -209,8 +217,42 @@ router.post("/:id/message", async (req, res, next) => {
 
     if (aiMsgErr) throw aiMsgErr;
 
+    // Track message count and flip completed → re-opened
+    const newCount = (session.message_count || 0) + 2;
+    const sessionUpdates = { message_count: newCount };
+    if (session.status === "completed") {
+      sessionUpdates.status = "re-opened";
+    }
+
+    await supabase
+      .from("interrogation_sessions")
+      .update(sessionUpdates)
+      .eq("id", session.id);
+
+    // Fire-and-forget provisional title after 3 exchanges (6 messages)
+    if (newCount === 6 && !session.title) {
+      supabase
+        .from("session_messages")
+        .select("role, content")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: true })
+        .then(({ data: allMsgs }) => {
+          const conversation = formatConversation(allMsgs || []);
+          return generateProvisionalTitle(conversation);
+        })
+        .then((title) => {
+          supabase
+            .from("interrogation_sessions")
+            .update({ title, title_generated_at: new Date().toISOString() })
+            .eq("id", session.id);
+        })
+        .catch(() => {});
+    }
+
+    const updatedStatus = sessionUpdates.status || session.status;
+
     res.json({
-      data: { employeeMessage: empMsg, aiMessage: aiMsg },
+      data: { employeeMessage: empMsg, aiMessage: aiMsg, sessionStatus: updatedStatus },
       error: null,
       message: null,
     });
@@ -220,12 +262,12 @@ router.post("/:id/message", async (req, res, next) => {
   }
 });
 
-// POST /api/sessions/:id/complete — mark session completed and generate articles
+// POST /api/sessions/:id/complete — two-path completion
 router.post("/:id/complete", async (req, res, next) => {
   try {
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("*, roles(name)")
+      .select("*, roles(name), employees(name)")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -238,38 +280,135 @@ router.post("/:id/complete", async (req, res, next) => {
       });
     }
 
-    const { data: completed, error: updateErr } = await supabase
-      .from("interrogation_sessions")
-      .update({ status: "completed", completed_at: new Date().toISOString() })
-      .eq("id", session.id)
-      .select()
-      .single();
-
-    if (updateErr) throw updateErr;
-
     const { data: messages, error: msgErr } = await supabase
       .from("session_messages")
-      .select("role, content")
+      .select("*")
       .eq("session_id", session.id)
       .order("created_at", { ascending: true });
 
     if (msgErr) throw msgErr;
 
-    const conversation = messages
-      .map((m) => `${m.role === "ai" ? "AI" : "Employee"}: ${m.content}`)
-      .join("\n\n");
+    const conversation = formatConversation(messages);
+    const roleName = session.roles?.name || "employee";
+    const lastMessage = messages[messages.length - 1];
 
-    let articles = [];
-    let generationFailed = false;
-    try {
-      const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
-      articles = await generateArticles(prompt);
-    } catch (genErr) {
-      generationFailed = true;
-      console.error("[ARTICLE GEN] Failed:", genErr.message?.slice(0, 200));
+    // ── PATH A: First completion ──────────────────────────────────────────
+    if (session.status === "active") {
+      let articles = [];
+      let title = session.title || `${roleName} Session`;
+
+      try {
+        [articles, title] = await Promise.all([
+          generateArticles(buildArticleGenerationPrompt(conversation, roleName)),
+          generateSessionTitle(conversation),
+        ]);
+      } catch (genErr) {
+        console.error("[COMPLETE] Generation failed:", genErr.message?.slice(0, 200));
+        return res.json({
+          data: { type: "generation_failed", generationFailed: true },
+          error: null,
+          message: null,
+        });
+      }
+
+      if (articles.length === 0) {
+        return res.json({
+          data: { type: "generation_empty" },
+          error: null,
+          message: null,
+        });
+      }
+
+      await supabase
+        .from("interrogation_sessions")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          last_completed_at: new Date().toISOString(),
+          last_completion_message_id: lastMessage?.id || null,
+          title,
+          title_generated_at: new Date().toISOString(),
+        })
+        .eq("id", session.id);
+
+      return res.json({
+        data: { type: "first_completion", articles, title },
+        error: null,
+        message: null,
+      });
     }
 
-    res.json({ data: { session: completed, articles, generationFailed }, error: null, message: null });
+    // ── PATH B: Re-opened completion ──────────────────────────────────────
+    if (session.status === "re-opened") {
+      const { data: existingArticles } = await supabase
+        .from("knowledge_articles")
+        .select("id, title, content, summary, tags")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: true });
+
+      const lastCompletionIndex = session.last_completion_message_id
+        ? messages.findIndex((m) => m.id === session.last_completion_message_id)
+        : -1;
+
+      const newMessages = messages.slice(lastCompletionIndex + 1);
+      const newConversation = formatConversation(newMessages);
+
+      let diffResult;
+      try {
+        diffResult = await runKnowledgeDiff(existingArticles || [], newConversation);
+      } catch (diffErr) {
+        console.error("[COMPLETE] Diff failed:", diffErr.message?.slice(0, 200));
+        return res.json({
+          data: { type: "generation_failed", generationFailed: true },
+          error: null,
+          message: null,
+        });
+      }
+
+      await supabase
+        .from("interrogation_sessions")
+        .update({
+          status: "completed",
+          last_completed_at: new Date().toISOString(),
+          last_completion_message_id: lastMessage?.id || null,
+        })
+        .eq("id", session.id);
+
+      if (diffResult.nothing_new) {
+        return res.json({
+          data: { type: "nothing_new" },
+          error: null,
+          message: null,
+        });
+      }
+
+      const enrichedUpdates = (diffResult.updated_articles || []).map((u) => {
+        const existing = (existingArticles || []).find((a) => a.id === u.id);
+        return {
+          ...u,
+          current_title: existing?.title || u.title,
+          current_content: existing?.content || "",
+          current_summary: existing?.summary || "",
+        };
+      });
+
+      return res.json({
+        data: {
+          type: "re_opened_completion",
+          new_articles: diffResult.new_articles || [],
+          updated_articles: enrichedUpdates,
+        },
+        error: null,
+        message: null,
+      });
+    }
+
+    // Unexpected status
+    return res.status(400).json({
+      data: null,
+      error: "Cannot complete session",
+      message: "Something went wrong — try again.",
+    });
   } catch (err) {
     next(err);
   }
@@ -301,10 +440,7 @@ router.post("/:id/articles", async (req, res, next) => {
 
     if (msgErr) throw msgErr;
 
-    const conversation = messages
-      .map((m) => `${m.role === "ai" ? "AI" : "Employee"}: ${m.content}`)
-      .join("\n\n");
-
+    const conversation = formatConversation(messages);
     const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
     const articles = await generateArticles(prompt);
 
