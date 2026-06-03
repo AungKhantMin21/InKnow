@@ -26,6 +26,7 @@ export const getSession = (id) => api.get(`/api/sessions/${id}`);
 export const sendMessage = (id, content) =>
   api.post(`/api/sessions/${id}/message`, { content });
 export const completeSession = (id) => api.post(`/api/sessions/${id}/complete`);
+export const retryArticleGeneration = (id) => api.post(`/api/sessions/${id}/articles`);
 
 // Knowledge
 export const saveArticle = (data) => api.post("/api/knowledge", data);

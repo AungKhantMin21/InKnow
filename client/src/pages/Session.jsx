@@ -68,6 +68,7 @@ const Session = () => {
   const [captures, setCaptures] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [error, setError] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -143,16 +144,20 @@ const Session = () => {
   };
 
   const handleComplete = async () => {
+    setCompleting(true);
+    setError(null);
     try {
       const { data } = await completeSession(id);
       navigate(`/session-complete/${id}`, {
         state: {
           articles: data.data.articles,
+          generationFailed: data.data.generationFailed,
           roleId: session?.role_id,
         },
       });
     } catch {
       setError("Something went wrong — try again.");
+      setCompleting(false);
     }
   };
 
@@ -211,9 +216,10 @@ const Session = () => {
         {employeeMessageCount >= 8 && (
           <button
             onClick={handleComplete}
-            className="bg-ink text-surface font-body font-medium text-xs px-4 py-1.5 tracking-wider uppercase hover:bg-ink-2 transition-colors"
+            disabled={completing || isTyping}
+            className="bg-ink text-surface font-body font-medium text-xs px-4 py-1.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50"
           >
-            End session
+            {completing ? "Generating articles…" : "End session"}
           </button>
         )}
       </div>
@@ -243,14 +249,15 @@ const Session = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your reply…"
+              placeholder={completing ? "Generating your articles…" : "Type your reply…"}
               rows={1}
-              className="flex-1 border border-rule bg-surface font-body font-light text-sm text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors placeholder:text-ink-4 resize-none"
+              disabled={completing}
+              className="flex-1 border border-rule bg-surface font-body font-light text-sm text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors placeholder:text-ink-4 resize-none disabled:opacity-50"
               style={{ minHeight: 44 }}
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isTyping}
+              disabled={!input.trim() || isTyping || completing}
               className="bg-ink text-surface font-body font-medium text-xs px-5 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-40 flex-shrink-0"
             >
               Send
