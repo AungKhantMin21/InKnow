@@ -5,6 +5,9 @@ const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" 
 
 /** Returns a float array of 768 dimensions for pgvector storage */
 export const generateEmbedding = async (text) => {
-  const result = await embeddingModel.embedContent(text);
+  const result = await embeddingModel.embedContent({
+    content: { parts: [{ text }] },
+    outputDimensionality: 768,
+  });
   return result.embedding.values;
 };
