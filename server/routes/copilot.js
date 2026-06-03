@@ -31,13 +31,26 @@ router.post("/query", async (req, res, next) => {
       confidence = articles[0].similarity ?? 0;
     }
 
-    const sources = articles.map((a) => ({
-      id: a.id,
-      title: a.title,
-      captured_by_name: a.captured_by_name,
-      created_at: a.created_at,
-      similarity: a.similarity,
-    }));
+    // Gemini may return gap language even when articles were retrieved —
+    // it means the retrieved articles weren't relevant enough to answer.
+    // Normalise those cases to a true gap state so the client renders
+    // the gap UI rather than a low-confidence "answer" with sources.
+    const GAP_PHRASES = ["nobody has captured", "nobody's captured", "nobody captured"];
+    const isGap = !answer || GAP_PHRASES.some((p) => answer.toLowerCase().includes(p));
+    if (isGap) {
+      answer = null;
+      confidence = 0;
+    }
+
+    const sources = isGap
+      ? []
+      : articles.map((a) => ({
+          id: a.id,
+          title: a.title,
+          captured_by_name: a.captured_by_name,
+          created_at: a.created_at,
+          similarity: a.similarity,
+        }));
 
     const { data: saved, error: saveErr } = await supabase
       .from("copilot_queries")
