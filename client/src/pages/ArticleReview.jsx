@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { saveArticle } from "../lib/api.js";
+import { saveArticle, updateKnowledgeArticle } from "../lib/api.js";
 import { markdownToHtml, htmlToMarkdown } from "../lib/markdown.js";
 
 const markdownComponents = {
@@ -75,9 +75,28 @@ const ArticleReview = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { articles: initial = [], roleId, roleName, sessionId } = location.state || {};
+  const {
+    type,
+    articles: initialArticles = [],
+    new_articles: initialNew = [],
+    updated_articles: initialUpdated = [],
+    roleId,
+    roleName,
+    sessionId,
+  } = location.state || {};
 
-  const [articles, setArticles] = useState(initial.map((a) => ({ ...a })));
+  // Build a unified review queue: new articles first, then diff items
+  const buildQueue = () => {
+    if (type === "re_opened_completion") {
+      return [
+        ...initialNew.map((a) => ({ ...a, itemType: "new" })),
+        ...initialUpdated.map((a) => ({ ...a, itemType: "update" })),
+      ];
+    }
+    return initialArticles.map((a) => ({ ...a, itemType: "new" }));
+  };
+
+  const [articles, setArticles] = useState(buildQueue);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState("preview");
   const [editTitle, setEditTitle] = useState("");
@@ -92,6 +111,18 @@ const ArticleReview = () => {
     ],
     content: "",
   });
+
+  // When navigating to an update item, pre-load the proposed content
+  useEffect(() => {
+    if (!articles.length) return;
+    const item = articles[currentIndex];
+    if (item?.itemType === "update") {
+      setEditTitle(item.title);
+      setEditSummary(item.current_summary || "");
+      editor?.commands.setContent(markdownToHtml(item.content));
+      setMode("preview"); // diff items always show both columns
+    }
+  }, [currentIndex, editor]);
 
   if (!articles.length) {
     return (
@@ -161,6 +192,31 @@ const ArticleReview = () => {
     }
   };
 
+  const handleApplyUpdate = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const proposedContent = htmlToMarkdown(editor?.getHTML() || "");
+      await updateKnowledgeArticle({
+        article_id: current.id,
+        title: editTitle.trim() || current.title,
+        content: proposedContent,
+        update_reason: current.update_reason,
+        session_id: sessionId,
+      });
+      setSaving(false);
+      advance();
+    } catch {
+      setError("Something went wrong — try again.");
+      setSaving(false);
+    }
+  };
+
+  const handleKeepCurrent = () => {
+    setError(null);
+    advance();
+  };
+
   return (
     <div className="min-h-screen bg-surface" style={{ animation: "pageFade 200ms ease" }}>
 
@@ -219,51 +275,95 @@ const ArticleReview = () => {
             )}
           </div>
 
-          {/* Title */}
-          {mode === "preview" ? (
-            <h1 className="font-display text-ink mb-4" style={{ fontWeight: 200, fontSize: 32, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
-              {current.title}
-            </h1>
-          ) : (
-            <input
-              className="w-full border border-rule bg-surface text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors mb-4"
-              style={{ fontFamily: "var(--font-display)", fontWeight: 200, fontSize: 24, letterSpacing: "-0.02em" }}
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-            />
-          )}
-
-          {/* Summary */}
-          {mode === "preview" ? (
-            current.summary && (
-              <>
-                <p className="font-body font-light italic text-sm text-ink-3 mb-7" style={{ lineHeight: 1.65 }}>
-                  {current.summary}
+          {/* ── Diff view for update items ───────────────────────────────── */}
+          {current.itemType === "update" ? (
+            <>
+              <h1 className="font-display text-ink mb-2" style={{ fontWeight: 200, fontSize: 28, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+                {current.title}
+              </h1>
+              {current.update_reason && (
+                <p className="font-mono text-[10px] tracking-wider text-ink-3 italic mb-6">
+                  {current.update_reason}
                 </p>
-                <div className="h-px bg-rule mb-8" />
-              </>
-            )
-          ) : (
-            <>
-              <input
-                className="w-full border border-rule bg-surface font-body font-light text-sm text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors mb-5"
-                value={editSummary}
-                onChange={(e) => setEditSummary(e.target.value)}
-                placeholder="One-sentence summary"
-              />
-              <div className="h-px bg-rule mb-4" />
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Current version */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-ink-4">Current</span>
+                    <span className="font-mono text-[8px] tracking-wider uppercase px-1.5 py-0.5" style={{ color: "var(--ink-4)", background: "var(--ground)" }}>v{(current.version || 1)}</span>
+                  </div>
+                  <div className="bg-white border border-rule px-4 py-4" style={{ minHeight: 320 }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {current.current_content || ""}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+                {/* Proposed version */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-ink-4">Proposed</span>
+                    <span className="font-mono text-[8px] tracking-wider uppercase px-1.5 py-0.5" style={{ color: "var(--amber)", background: "var(--amber-light)" }}>v{(current.version || 1) + 1}</span>
+                    <span className="font-mono text-[8px] tracking-wider text-ink-4 ml-auto">Editable</span>
+                  </div>
+                  <div className="bg-white border border-rule" style={{ minHeight: 320 }}>
+                    <Toolbar editor={editor} />
+                    <div className="px-4 py-4">
+                      <EditorContent editor={editor} />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
-          )}
-
-          {/* Content */}
-          {mode === "preview" ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {current.content}
-            </ReactMarkdown>
           ) : (
             <>
-              <Toolbar editor={editor} />
-              <EditorContent editor={editor} />
+              {/* Title */}
+              {mode === "preview" ? (
+                <h1 className="font-display text-ink mb-4" style={{ fontWeight: 200, fontSize: 32, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+                  {current.title}
+                </h1>
+              ) : (
+                <input
+                  className="w-full border border-rule bg-surface text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors mb-4"
+                  style={{ fontFamily: "var(--font-display)", fontWeight: 200, fontSize: 24, letterSpacing: "-0.02em" }}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+              )}
+
+              {/* Summary */}
+              {mode === "preview" ? (
+                current.summary && (
+                  <>
+                    <p className="font-body font-light italic text-sm text-ink-3 mb-7" style={{ lineHeight: 1.65 }}>
+                      {current.summary}
+                    </p>
+                    <div className="h-px bg-rule mb-8" />
+                  </>
+                )
+              ) : (
+                <>
+                  <input
+                    className="w-full border border-rule bg-surface font-body font-light text-sm text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors mb-5"
+                    value={editSummary}
+                    onChange={(e) => setEditSummary(e.target.value)}
+                    placeholder="One-sentence summary"
+                  />
+                  <div className="h-px bg-rule mb-4" />
+                </>
+              )}
+
+              {/* Content */}
+              {mode === "preview" ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                  {current.content}
+                </ReactMarkdown>
+              ) : (
+                <>
+                  <Toolbar editor={editor} />
+                  <EditorContent editor={editor} />
+                </>
+              )}
             </>
           )}
 
@@ -318,7 +418,28 @@ const ArticleReview = () => {
       {/* Sticky bottom bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-rule z-10">
         <div className="flex items-center px-8 py-4" style={{ maxWidth: "calc(720px + 64px)", margin: "0 auto" }}>
-          {mode === "preview" ? (
+          {current.itemType === "update" ? (
+            /* Diff item actions */
+            <>
+              <div className="flex items-center gap-3">
+                <button onClick={handleApplyUpdate} disabled={saving} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50">
+                  {saving ? "Saving…" : "Apply update"}
+                </button>
+                <button onClick={handleKeepCurrent} disabled={saving} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors disabled:opacity-40">
+                  Keep current
+                </button>
+              </div>
+              <div className="flex-1" />
+              {error ? (
+                <p className="font-body text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+              ) : (
+                <span className="font-mono text-[10px] tracking-wider text-ink-4">
+                  Updated articles go back to manager review
+                </span>
+              )}
+            </>
+          ) : mode === "preview" ? (
+            /* New article preview actions */
             <>
               <div className="flex items-center gap-3">
                 <button onClick={handleApprove} disabled={saving} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50">
@@ -338,6 +459,7 @@ const ArticleReview = () => {
               )}
             </>
           ) : (
+            /* New article edit actions */
             <>
               <div className="flex items-center gap-3">
                 <button onClick={saveEdits} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors">
