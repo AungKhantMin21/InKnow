@@ -30,5 +30,8 @@ export const retryArticleGeneration = (id) => api.post(`/api/sessions/${id}/arti
 
 // Knowledge
 export const saveArticle = (data) => api.post("/api/knowledge", data);
+export const getArticles = (params) => api.get("/api/knowledge", { params });
+export const getArticle = (id) => api.get(`/api/knowledge/${id}`);
+export const updateArticle = (id, data) => api.patch(`/api/knowledge/${id}`, data);
 
 export default api;
