@@ -260,15 +260,55 @@ router.post("/:id/complete", async (req, res, next) => {
       .join("\n\n");
 
     let articles = [];
+    let generationFailed = false;
     try {
       const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
       articles = await generateArticles(prompt);
     } catch (genErr) {
-      // Non-fatal — session is still marked complete, articles will be empty
+      generationFailed = true;
       console.error("[ARTICLE GEN] Failed:", genErr.message?.slice(0, 200));
     }
 
-    res.json({ data: { session: completed, articles }, error: null, message: null });
+    res.json({ data: { session: completed, articles, generationFailed }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/sessions/:id/articles — retry article generation for a completed session
+router.post("/:id/articles", async (req, res, next) => {
+  try {
+    const { data: session, error: sessionErr } = await supabase
+      .from("interrogation_sessions")
+      .select("*, roles(name)")
+      .eq("id", req.params.id)
+      .eq("employee_id", req.employee.id)
+      .single();
+
+    if (sessionErr || !session) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { data: messages, error: msgErr } = await supabase
+      .from("session_messages")
+      .select("role, content")
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: true });
+
+    if (msgErr) throw msgErr;
+
+    const conversation = messages
+      .map((m) => `${m.role === "ai" ? "AI" : "Employee"}: ${m.content}`)
+      .join("\n\n");
+
+    const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
+    const articles = await generateArticles(prompt);
+
+    res.json({ data: { articles }, error: null, message: null });
   } catch (err) {
     next(err);
   }
