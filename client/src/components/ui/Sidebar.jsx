@@ -19,6 +19,9 @@ const isActive = (path, location) => {
   if (path === "/knowledge") {
     return location.pathname.startsWith("/knowledge");
   }
+  if (path === "/inno") {
+    return location.pathname === "/inno";
+  }
   return location.pathname === path;
 };
 

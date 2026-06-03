@@ -34,4 +34,8 @@ export const getArticles = (params) => api.get("/api/knowledge", { params });
 export const getArticle = (id) => api.get(`/api/knowledge/${id}`);
 export const updateArticle = (id, data) => api.patch(`/api/knowledge/${id}`, data);
 
+// Copilot
+export const queryCopilot = (question) => api.post("/api/copilot/query", { question });
+export const submitFeedback = (query_id, feedback) => api.post("/api/copilot/feedback", { query_id, feedback });
+
 export default api;

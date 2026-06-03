@@ -8,6 +8,7 @@ import SessionComplete from "./pages/SessionComplete.jsx";
 import ArticleReview from "./pages/ArticleReview.jsx";
 import Knowledge from "./pages/Knowledge.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
+import Copilot from "./pages/Copilot.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -86,6 +87,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <ArticleDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inno"
+        element={
+          <ProtectedRoute>
+            <Copilot />
           </ProtectedRoute>
         }
       />
