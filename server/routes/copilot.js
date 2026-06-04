@@ -3,10 +3,39 @@ import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
 import { enrichWithNames } from "../services/rag.js";
 import { generateEmbedding } from "../services/embeddings.js";
-import { classifyQuestion, expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
+import { expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
 
 const router = Router();
 router.use(auth);
+
+const detectQuestionType = (question) => {
+  const q = question.toLowerCase().trim();
+  const broad = [
+    // Explicit synthesis / explanation requests
+    /\b(explain|describe|summarize|summarise)\b/,
+    /\btell me (about|everything|all)\b/,
+    /\bwalk me through\b/,
+    /\bgive me (an? )?(overview|breakdown|rundown|summary)\b/,
+    /\beverything (about|related|i need)\b/,
+    // How a system works — not "how do I do X"
+    /\bhow does .+(work|function|operate)\b/,
+    /\bhow (is|are) .+(done|handled|managed|run|structured|organized)\b/,
+    /\bhow (do|can|should) (i|we) (approach|handle|manage|deal with)\b/,
+    // Process / policy questions
+    /\bwhat (is|are) the (process|procedure|workflow|policy|policies|guidelines?|rules?|requirements?|steps)\b/,
+    /\b(full|complete|entire|end.to.end) (process|guide|breakdown|overview|flow)\b/,
+    // Enumeration
+    /\bwhat are (all|the different|the main|the key|the various)\b/,
+    /\blist (all|the|every)\b/,
+    // Comparison
+    /\b(difference|differences) between\b/,
+    /\bcompare\b/,
+    // General guidance
+    /\bbest practices\b/,
+    /\bguidelines? for\b/,
+  ];
+  return broad.some((p) => p.test(q)) ? "broad" : "specific";
+};
 
 const calculateConfidence = (articles) => {
   if (!articles.length) return 0;
@@ -38,7 +67,7 @@ router.post("/query", async (req, res, next) => {
     }
 
     const q = question.trim();
-    const questionType = await classifyQuestion(q);
+    const questionType = detectQuestionType(q);
     const matchCount = questionType === "broad" ? 7 : 3;
     const matchThreshold = questionType === "broad" ? 0.35 : 0.4;
 
