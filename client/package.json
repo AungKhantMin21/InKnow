@@ -14,6 +14,7 @@
     "@tiptap/react": "^3.24.0",
     "@tiptap/starter-kit": "^3.24.0",
     "axios": "^1.16.1",
+    "diff-match-patch": "^1.0.5",
     "marked": "^18.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
