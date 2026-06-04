@@ -89,11 +89,11 @@ const getLineFont = (content, color) => {
 const DiffLine = ({ line, onInput, onRestore, registerRef }) => {
   const elRef = useRef(null);
 
-  const effectiveType = line.isRestored ? "restored" : line.isHumanEdited ? "human-edited" : line.type;
-  const s = LINE_STYLES[effectiveType];
+  // type now carries the full effective state — no flags needed
+  const s = LINE_STYLES[line.type] || LINE_STYLES.unchanged;
   const fontStyle = getLineFont(line.content, s.textColor);
 
-  // Set initial content once after mount — never let React overwrite it again
+  // Set initial content once after mount — browser manages it from here
   useLayoutEffect(() => {
     if (elRef.current) {
       elRef.current.innerText = line.content;
@@ -146,7 +146,7 @@ const DiffLine = ({ line, onInput, onRestore, registerRef }) => {
       />
 
       {/* Restore tooltip — only on removed lines */}
-      {effectiveType === "removed" && (
+      {line.type === "removed" && (
         <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "auto", zIndex: 1 }}>
           <button
             onClick={onRestore}
@@ -177,32 +177,56 @@ const DiffLine = ({ line, onInput, onRestore, registerRef }) => {
 const ArticleDiffView = ({ article, proposedUpdate, onApply, onKeep, saving, error }) => {
   const [lines, setLines] = useState(() =>
     computeLineDiff(article.content || "", proposedUpdate.content || "").map((d, i) => ({
-      id: i,
+      id: `line-${i}`,
+      // type is the live effective state, updated on transitions
       type: d.type,
       content: d.content,
-      isHumanEdited: false,
-      isRestored: false,
+      // never mutated — used for smart revert comparisons
+      originalContent: d.content,
     }))
   );
 
   const domRefs = useRef({});
-  const humanEdits = lines.filter(l => l.isHumanEdited || l.isRestored).length;
+
+  // Derived from lines so count is always accurate and unique per line
+  const humanEdits = lines.filter(l => l.type === "human-edited" || l.type === "restored").length;
 
   const handleInput = useCallback((id) => {
-    setLines(prev => {
-      const line = prev.find(l => l.id === id);
-      if (!line || line.type !== "unchanged" || line.isHumanEdited) return prev;
-      return prev.map(l => l.id === id ? { ...l, isHumanEdited: true } : l);
-    });
+    const currentContent = domRefs.current[id]?.innerText ?? "";
+    setLines(prev => prev.map(line => {
+      if (line.id !== id) return line;
+
+      const trimmed = currentContent.trim();
+      const original = line.originalContent.trim();
+
+      // Restored line typed back to original removed content → re-removed
+      if (line.type === "restored" && trimmed === original) {
+        return { ...line, type: "removed" };
+      }
+
+      // Human-edited or unchanged typed back to original → reverts to unchanged
+      if ((line.type === "human-edited" || line.type === "unchanged") && trimmed === original) {
+        return { ...line, type: "unchanged" };
+      }
+
+      // Unchanged line that now differs → becomes human-edited
+      if (line.type === "unchanged" && trimmed !== original) {
+        return { ...line, type: "human-edited" };
+      }
+
+      // Added line — stays added regardless of content
+      // All other cases — type unchanged, content tracked via DOM
+      return line;
+    }));
   }, []);
 
   const handleRestore = useCallback((id) => {
-    setLines(prev => prev.map(l => l.id === id ? { ...l, isRestored: true } : l));
+    setLines(prev => prev.map(l => l.id === id ? { ...l, type: "restored" } : l));
   }, []);
 
   const collectContent = () =>
     lines
-      .filter(l => l.type !== "removed" || l.isRestored)
+      .filter(l => l.type !== "removed")
       .map(l => {
         const el = domRefs.current[l.id];
         return el ? el.innerText : l.content;
@@ -226,7 +250,7 @@ const ArticleDiffView = ({ article, proposedUpdate, onApply, onKeep, saving, err
         ))}
       </div>
 
-      {/* Human edit counter */}
+      {/* Human edit counter — only shown when there are edits */}
       {humanEdits > 0 && (
         <div className="mt-3">
           <div
