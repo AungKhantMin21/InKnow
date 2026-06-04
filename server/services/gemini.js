@@ -211,6 +211,13 @@ If nothing genuinely new was captured:
 
 Never invent information.
 Never update an article unless new messages explicitly contain different or additional information about that specific topic.
+
+Additional constraints:
+- Never output --- as content
+- Never mark a paragraph as both removed and added if the meaning is the same — only flag genuine changes
+- Preserve unchanged paragraphs verbatim
+- Compare at the paragraph level, not the word level
+- Never duplicate the same information in both new_articles and updated_articles
 `.trim();
 
   const result = await model.generateContent(prompt);
