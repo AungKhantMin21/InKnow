@@ -257,35 +257,79 @@ export const generateArticles = async (prompt) => {
   }
 };
 
-/** Build the copilot RAG prompt from a question and retrieved articles */
-export const buildCopilotPrompt = (question, articles) =>
-  `
-You are InKnow's knowledge assistant. Answer using only the articles below.
-Do not use any outside information.
+/** Rewrites the question into 3 search query variants for broader retrieval coverage */
+export const expandQuery = async (question) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const result = await model.generateContent(`
+Rewrite the following question into 3 search queries
+for an internal company knowledge base.
 
-KNOWLEDGE ARTICLES:
-${articles
-  .map(
-    (a, i) => `
-[Article ${i + 1}]
-Title: ${a.title}
-Content: ${a.content}
+Original: "${question}"
+
+Rules:
+- Query 1: rephrase as a direct factual question
+- Query 2: keywords and topic nouns only, no sentence
+- Query 3: rephrase as a step-by-step process question
+- Max 12 words each
+- Return only a JSON array of 3 strings
+- No explanation, no markdown fences
+
+Return format: ["query1", "query2", "query3"]
+`.trim());
+
+    const text = result.response.text();
+    const clean = text.replace(/```json|```/g, "").trim();
+    const queries = JSON.parse(clean);
+    return [...new Set([question, ...queries])];
+  } catch {
+    return [question];
+  }
+};
+
+/** Build the copilot RAG prompt from a question, retrieved articles, and question type */
+export const buildCopilotPrompt = (question, articles, questionType) =>
+  `
+You are InKnow — an internal knowledge assistant.
+Answer using ONLY the articles provided below.
+Do not use any outside knowledge.
+
+ARTICLES (${articles.length} retrieved):
+${articles.map((a, i) => `[${i + 1}] ${a.title}
 Captured by: ${a.captured_by_name} · ${a.created_at}
-`,
-  )
-  .join("\n---\n")}
+${"─".repeat(40)}
+${a.content}`).join("\n\n")}
 
 QUESTION: ${question}
 
-Rules:
-- Answer directly and specifically
-- Use only information from the articles above
-- If articles partially answer: "The knowledge base has partial information on this..."
-- If no relevant information: "Nobody has captured this yet."
-- Never invent information
-- Keep answers concise: 2–4 sentences for simple questions, more for processes
-- End with: "Source: [Article title] · [Name]"
-  Multiple sources: list each on a new line
+${questionType === "broad" ? `
+This is a broad question. Your answer must:
+
+- Synthesize information across ALL relevant articles
+- Give a complete, detailed response
+- Include step-by-step instructions if the question
+  is about how to do something
+- Use specific names, system names, and details
+  from the articles — not generic descriptions
+- Be thorough — a shallow answer is a wrong answer
+  for this type of question
+` : `
+This is a specific question. Your answer must:
+- Be direct and precise
+- Answer exactly what was asked
+- Keep it concise — 2-4 sentences is often enough
+`}
+
+Common rules:
+
+- Never mention that you are an AI
+- If articles partially answer the question,
+  give what you have and note what is missing
+- If no articles are relevant: respond with exactly
+  "Nobody has captured this yet."
+- End with sources used:
+  Source: [title] · [captured by]
+  (one per line, only articles actually used)
 `.trim();
 
 /** Answer a copilot question from retrieved article context */
