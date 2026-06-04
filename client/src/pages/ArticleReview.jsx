@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { saveArticle, updateKnowledgeArticle } from "../lib/api.js";
 import { markdownToHtml, htmlToMarkdown } from "../lib/markdown.js";
+import ArticleDiffView from "../components/knowledge/ArticleDiffView.jsx";
 
 const markdownComponents = {
   h2: ({ children }) => (
@@ -85,7 +86,6 @@ const ArticleReview = () => {
     sessionId,
   } = location.state || {};
 
-  // Build a unified review queue: new articles first, then diff items
   const buildQueue = () => {
     if (type === "re_opened_completion") {
       return [
@@ -112,17 +112,11 @@ const ArticleReview = () => {
     content: "",
   });
 
-  // When navigating to an update item, pre-load the proposed content
+  // Reset mode and error when navigating between articles
   useEffect(() => {
-    if (!articles.length) return;
-    const item = articles[currentIndex];
-    if (item?.itemType === "update") {
-      setEditTitle(item.title);
-      setEditSummary(item.current_summary || "");
-      editor?.commands.setContent(markdownToHtml(item.content));
-      setMode("preview"); // diff items always show both columns
-    }
-  }, [currentIndex, editor]);
+    setMode("preview");
+    setError(null);
+  }, [currentIndex]);
 
   if (!articles.length) {
     return (
@@ -142,6 +136,17 @@ const ArticleReview = () => {
   const next = articles[currentIndex + 1];
   const total = articles.length;
   const progressPct = ((currentIndex + 1) / total) * 100;
+  const isUpdate = current.itemType === "update";
+
+  const advance = () => {
+    setMode("preview");
+    setError(null);
+    if (currentIndex < total - 1) {
+      setCurrentIndex((i) => i + 1);
+    } else {
+      navigate("/knowledge");
+    }
+  };
 
   const enterEditMode = () => {
     setEditTitle(current.title);
@@ -160,16 +165,6 @@ const ArticleReview = () => {
       )
     );
     setMode("preview");
-  };
-
-  const advance = () => {
-    setMode("preview");
-    setError(null);
-    if (currentIndex < total - 1) {
-      setCurrentIndex((i) => i + 1);
-    } else {
-      navigate("/knowledge");
-    }
   };
 
   const handleApprove = async () => {
@@ -192,15 +187,14 @@ const ArticleReview = () => {
     }
   };
 
-  const handleApplyUpdate = async () => {
+  const handleApplyUpdate = async (finalContent) => {
     setSaving(true);
     setError(null);
     try {
-      const proposedContent = htmlToMarkdown(editor?.getHTML() || "");
       await updateKnowledgeArticle({
         article_id: current.id,
-        title: editTitle.trim() || current.title,
-        content: proposedContent,
+        title: current.title,
+        content: finalContent,
         update_reason: current.update_reason,
         session_id: sessionId,
       });
@@ -217,33 +211,39 @@ const ArticleReview = () => {
     advance();
   };
 
+  // Topbar labels differ for update vs new article flows
+  const topbarLabel = isUpdate ? "Review updates" : "Review articles";
+  const topbarCounter = isUpdate
+    ? `Article ${currentIndex + 1} of ${total} updated`
+    : `Article ${currentIndex + 1} of ${total}`;
+  const backPath = isUpdate ? "/sessions" : "/knowledge";
+  const backLabel = isUpdate ? "← Sessions" : "← Knowledge";
+
   return (
     <div className="min-h-screen bg-surface" style={{ animation: "pageFade 200ms ease" }}>
 
-      {/* Sticky header: topbar + progress bar */}
+      {/* Sticky topbar + progress bar */}
       <div className="sticky top-0 z-10">
         <div className="bg-white border-b border-rule flex items-center px-8 gap-4" style={{ height: 52 }}>
-          <button onClick={() => navigate("/knowledge")} className="font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
-            ← Knowledge
+          <button onClick={() => navigate(backPath)} className="font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
+            {backLabel}
           </button>
           <div className="w-px h-4 bg-rule" />
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">
-            Review articles
+            {topbarLabel}
           </span>
           <div className="flex-1" />
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { setCurrentIndex((i) => i - 1); setMode("preview"); setError(null); }}
+              onClick={() => setCurrentIndex((i) => i - 1)}
               disabled={currentIndex === 0 || mode === "edit"}
               className="font-mono text-[11px] text-ink-3 hover:text-ink transition-colors disabled:opacity-20 disabled:cursor-default px-1"
             >
               ←
             </button>
-            <span className="font-mono text-[11px] text-ink-3">
-              Article <span className="font-medium text-ink">{currentIndex + 1}</span> of {total}
-            </span>
+            <span className="font-mono text-[11px] text-ink-3">{topbarCounter}</span>
             <button
-              onClick={() => { setCurrentIndex((i) => i + 1); setMode("preview"); setError(null); }}
+              onClick={() => setCurrentIndex((i) => i + 1)}
               disabled={currentIndex === total - 1 || mode === "edit"}
               className="font-mono text-[11px] text-ink-3 hover:text-ink transition-colors disabled:opacity-20 disabled:cursor-default px-1"
             >
@@ -251,72 +251,100 @@ const ArticleReview = () => {
             </button>
           </div>
         </div>
+        {/* 2px progress bar */}
         <div className="h-0.5 bg-rule">
           <div className="h-full bg-ink transition-all duration-300" style={{ width: `${progressPct}%` }} />
         </div>
       </div>
 
       {/* Content column */}
-      <main className="flex justify-center px-8 py-12" style={{ paddingBottom: 120 }}>
-        <div style={{ maxWidth: 720, width: "100%" }}>
+      <main
+        className="flex justify-center"
+        style={{ padding: "36px 36px 120px" }}
+      >
+        <div style={{ maxWidth: 760, width: "100%" }}>
 
-          {/* Article meta row */}
-          <div className="flex items-center justify-between mb-5">
-            {roleName ? (
-              <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
-                {roleName}
-              </span>
-            ) : <div />}
-            {mode === "preview" && (
-              <button onClick={enterEditMode} className="flex items-center gap-1.5 font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
-                <PencilIcon />
-                Edit this article
-              </button>
-            )}
-          </div>
-
-          {/* ── Diff view for update items ───────────────────────────────── */}
-          {current.itemType === "update" ? (
+          {/* ── Update diff layout ───────────────────────────────────────────── */}
+          {isUpdate ? (
             <>
-              <h1 className="font-display text-ink mb-2" style={{ fontWeight: 200, fontSize: 28, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
+              {/* Role badge + version badge */}
+              <div className="flex items-center justify-between mb-6">
+                {roleName ? (
+                  <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
+                    {roleName}
+                  </span>
+                ) : <div />}
+                <span
+                  className="font-mono text-[8px] tracking-wider uppercase px-2 py-1"
+                  style={{ color: "var(--amber)", background: "var(--amber-light)" }}
+                >
+                  v{current.version || 1} → v{(current.version || 1) + 1}
+                </span>
+              </div>
+
+              {/* Reason box */}
+              {current.update_reason && (
+                <div
+                  className="mb-6 px-4 py-3"
+                  style={{ background: "var(--volt-light)", borderLeft: "2px solid var(--volt)" }}
+                >
+                  <p
+                    className="font-mono mb-1"
+                    style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--volt)" }}
+                  >
+                    Why this is being updated
+                  </p>
+                  <p className="font-body font-light text-ink-2" style={{ fontSize: 13, lineHeight: 1.6 }}>
+                    {current.update_reason}
+                  </p>
+                </div>
+              )}
+
+              {/* Article title */}
+              <h1
+                className="font-display text-ink mb-2"
+                style={{ fontWeight: 200, fontSize: 26, letterSpacing: "-0.02em", lineHeight: 1.1 }}
+              >
                 {current.title}
               </h1>
-              {current.update_reason && (
-                <p className="font-mono text-[10px] tracking-wider text-ink-3 italic mb-6">
-                  {current.update_reason}
-                </p>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Current version */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-ink-4">Current</span>
-                    <span className="font-mono text-[8px] tracking-wider uppercase px-1.5 py-0.5" style={{ color: "var(--ink-4)", background: "var(--ground)" }}>v{(current.version || 1)}</span>
-                  </div>
-                  <div className="bg-white border border-rule px-4 py-4" style={{ minHeight: 320 }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {current.current_content || ""}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-                {/* Proposed version */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="font-mono text-[8px] tracking-[0.18em] uppercase text-ink-4">Proposed</span>
-                    <span className="font-mono text-[8px] tracking-wider uppercase px-1.5 py-0.5" style={{ color: "var(--amber)", background: "var(--amber-light)" }}>v{(current.version || 1) + 1}</span>
-                    <span className="font-mono text-[8px] tracking-wider text-ink-4 ml-auto">Editable</span>
-                  </div>
-                  <div className="bg-white border border-rule" style={{ minHeight: 320 }}>
-                    <Toolbar editor={editor} />
-                    <div className="px-4 py-4">
-                      <EditorContent editor={editor} />
-                    </div>
-                  </div>
-                </div>
-              </div>
+
+              {/* Subtitle hint */}
+              <p
+                className="font-body font-light italic text-ink-4 mb-5"
+                style={{ fontSize: 12 }}
+              >
+                Click any green or grey line to edit directly. Hover a red line to restore it.
+              </p>
+
+              {/* Unified diff view — owns the sticky bottom bar */}
+              <ArticleDiffView
+                key={current.id}
+                article={{ content: current.current_content, version: current.version }}
+                proposedUpdate={{ content: current.content, update_reason: current.update_reason }}
+                onApply={handleApplyUpdate}
+                onKeep={handleKeepCurrent}
+                saving={saving}
+                error={error}
+              />
             </>
           ) : (
+            /* ── New article layout ─────────────────────────────────────────── */
             <>
+              {/* Meta row */}
+              <div className="flex items-center justify-between mb-5">
+                {roleName ? (
+                  <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
+                    {roleName}
+                  </span>
+                ) : <div />}
+                {mode === "preview" && (
+                  <button onClick={enterEditMode} className="flex items-center gap-1.5 font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
+                    <PencilIcon />
+                    Edit this article
+                  </button>
+                )}
+              </div>
+
               {/* Title */}
               {mode === "preview" ? (
                 <h1 className="font-display text-ink mb-4" style={{ fontWeight: 200, fontSize: 32, letterSpacing: "-0.02em", lineHeight: 1.1 }}>
@@ -364,119 +392,85 @@ const ArticleReview = () => {
                   <EditorContent editor={editor} />
                 </>
               )}
+
+              {/* Article navigation — preview mode only */}
+              {mode === "preview" && (prev || next) && (
+                <div style={{ marginTop: 48 }}>
+                  <div className="h-px bg-rule mb-5" />
+                  {prev && (
+                    <div className={next ? "mb-4" : ""}>
+                      <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">Previous article</span>
+                      <button
+                        onClick={() => setCurrentIndex((i) => i - 1)}
+                        className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
+                      >
+                        <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">← {currentIndex} of {total}</span>
+                        <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>{prev.title}</span>
+                      </button>
+                    </div>
+                  )}
+                  {next && (
+                    <div>
+                      <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">Next article</span>
+                      <button
+                        onClick={() => setCurrentIndex((i) => i + 1)}
+                        className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
+                      >
+                        <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>{next.title}</span>
+                        <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">{currentIndex + 2} of {total} →</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
-          )}
-
-          {/* Article navigation — preview mode only */}
-          {mode === "preview" && (prev || next) && (
-            <div style={{ marginTop: 48 }}>
-              <div className="h-px bg-rule mb-5" />
-
-              {prev && (
-                <div className={next ? "mb-4" : ""}>
-                  <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">
-                    Previous article
-                  </span>
-                  <button
-                    onClick={() => { setCurrentIndex((i) => i - 1); setError(null); }}
-                    className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
-                  >
-                    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
-                      ← {currentIndex} of {total}
-                    </span>
-                    <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>
-                      {prev.title}
-                    </span>
-                  </button>
-                </div>
-              )}
-
-              {next && (
-                <div>
-                  <span className="font-mono text-[8px] tracking-[0.22em] uppercase text-ink-4">
-                    Next article
-                  </span>
-                  <button
-                    onClick={() => { setCurrentIndex((i) => i + 1); setError(null); }}
-                    className="w-full bg-white border border-rule hover:border-rule-hi transition-colors px-5 py-4 flex items-center gap-4 text-left mt-3"
-                  >
-                    <span className="font-display text-ink-3 flex-1 text-sm" style={{ fontWeight: 200 }}>
-                      {next.title}
-                    </span>
-                    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
-                      {currentIndex + 2} of {total} →
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
           )}
 
         </div>
       </main>
 
-      {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-rule z-10">
-        <div className="flex items-center px-8 py-4" style={{ maxWidth: "calc(720px + 64px)", margin: "0 auto" }}>
-          {current.itemType === "update" ? (
-            /* Diff item actions */
-            <>
-              <div className="flex items-center gap-3">
-                <button onClick={handleApplyUpdate} disabled={saving} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50">
-                  {saving ? "Saving…" : "Apply update"}
-                </button>
-                <button onClick={handleKeepCurrent} disabled={saving} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors disabled:opacity-40">
-                  Keep current
-                </button>
-              </div>
-              <div className="flex-1" />
-              {error ? (
-                <p className="font-body text-xs" style={{ color: "var(--danger)" }}>{error}</p>
-              ) : (
-                <span className="font-mono text-[10px] tracking-wider text-ink-4">
-                  Updated articles go back to manager review
+      {/* Sticky bottom bar — new articles only; update items use ArticleDiffView's own bar */}
+      {!isUpdate && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-rule z-10">
+          <div className="flex items-center px-9 py-4" style={{ maxWidth: "calc(760px + 72px)", margin: "0 auto" }}>
+            {mode === "preview" ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <button onClick={handleApprove} disabled={saving} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50">
+                    {saving ? "Saving…" : "Approve & save"}
+                  </button>
+                  <button onClick={advance} disabled={saving} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors disabled:opacity-40">
+                    Discard
+                  </button>
+                </div>
+                <div className="flex-1" />
+                {error ? (
+                  <p className="font-body text-xs" style={{ color: "var(--danger)" }}>{error}</p>
+                ) : (
+                  <span className="font-mono text-ink-4" style={{ fontSize: 10, letterSpacing: "0.04em" }}>
+                    Approved articles go to manager review
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <button onClick={saveEdits} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors">
+                    Save changes
+                  </button>
+                  <button onClick={() => setMode("preview")} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors">
+                    Cancel
+                  </button>
+                </div>
+                <div className="flex-1" />
+                <span className="font-mono text-ink-4" style={{ fontSize: 10, letterSpacing: "0.04em" }}>
+                  Editing article {currentIndex + 1}
                 </span>
-              )}
-            </>
-          ) : mode === "preview" ? (
-            /* New article preview actions */
-            <>
-              <div className="flex items-center gap-3">
-                <button onClick={handleApprove} disabled={saving} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50">
-                  {saving ? "Saving…" : "Approve & save"}
-                </button>
-                <button onClick={advance} disabled={saving} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors disabled:opacity-40">
-                  Discard
-                </button>
-              </div>
-              <div className="flex-1" />
-              {error ? (
-                <p className="font-body text-xs" style={{ color: "var(--danger)" }}>{error}</p>
-              ) : (
-                <span className="font-mono text-[10px] tracking-wider text-ink-4">
-                  Approved articles go to manager review
-                </span>
-              )}
-            </>
-          ) : (
-            /* New article edit actions */
-            <>
-              <div className="flex items-center gap-3">
-                <button onClick={saveEdits} className="bg-ink text-surface font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase hover:bg-ink-2 transition-colors">
-                  Save changes
-                </button>
-                <button onClick={() => setMode("preview")} className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors">
-                  Cancel
-                </button>
-              </div>
-              <div className="flex-1" />
-              <span className="font-mono text-[10px] tracking-wider text-ink-4">
-                Editing article {currentIndex + 1}
-              </span>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
