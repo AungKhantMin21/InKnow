@@ -257,6 +257,35 @@ export const generateArticles = async (prompt) => {
   }
 };
 
+/** Classifies a question as 'broad' (needs synthesis) or 'specific' (direct answer) */
+export const classifyQuestion = async (question) => {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const result = await model.generateContent(`
+Classify this question as either "broad" or "specific".
+
+broad    — requires synthesizing across multiple topics or articles;
+           asks for an overview, a full process, or everything about a subject
+specific — has a single direct answer; asks about one fact, one step,
+           or one targeted thing
+
+Examples:
+"What is the onboarding process?" → broad
+"How can I turn on two-factor authentication?" → specific
+"Explain the refund policy" → broad
+"Who approves expenses over $500?" → specific
+
+Question: "${question}"
+
+Reply with exactly one word: broad or specific
+`.trim());
+    const text = result.response.text().trim().toLowerCase();
+    return text.startsWith("broad") ? "broad" : "specific";
+  } catch {
+    return "specific";
+  }
+};
+
 /** Rewrites the question into 3 search query variants for broader retrieval coverage */
 export const expandQuery = async (question) => {
   try {

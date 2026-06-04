@@ -3,21 +3,10 @@ import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
 import { enrichWithNames } from "../services/rag.js";
 import { generateEmbedding } from "../services/embeddings.js";
-import { expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
+import { classifyQuestion, expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
 
 const router = Router();
 router.use(auth);
-
-const detectQuestionType = (question) => {
-  const broadPatterns = [
-    "how do i", "how can i", "what is", "what are",
-    "explain", "tell me about", "walk me through",
-    "how does", "what should i", "give me",
-    "overview", "describe", "everything about",
-  ];
-  const q = question.toLowerCase();
-  return broadPatterns.some((p) => q.includes(p)) ? "broad" : "specific";
-};
 
 const calculateConfidence = (articles) => {
   if (!articles.length) return 0;
@@ -49,7 +38,7 @@ router.post("/query", async (req, res, next) => {
     }
 
     const q = question.trim();
-    const questionType = detectQuestionType(q);
+    const questionType = await classifyQuestion(q);
     const matchCount = questionType === "broad" ? 7 : 3;
     const matchThreshold = questionType === "broad" ? 0.35 : 0.4;
 
