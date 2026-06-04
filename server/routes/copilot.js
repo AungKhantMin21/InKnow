@@ -1,13 +1,41 @@
 import { Router } from "express";
 import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
-import { retrieveArticles } from "../services/rag.js";
-import { buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
+import { enrichWithNames } from "../services/rag.js";
+import { generateEmbedding } from "../services/embeddings.js";
+import { expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
 
 const router = Router();
 router.use(auth);
 
-// POST /api/copilot/query — embed question, retrieve articles, generate answer
+const detectQuestionType = (question) => {
+  const broadPatterns = [
+    "how do i", "how can i", "what is", "what are",
+    "explain", "tell me about", "walk me through",
+    "how does", "what should i", "give me",
+    "overview", "describe", "everything about",
+  ];
+  const q = question.toLowerCase();
+  return broadPatterns.some((p) => q.includes(p)) ? "broad" : "specific";
+};
+
+const calculateConfidence = (articles) => {
+  if (!articles.length) return 0;
+  return Math.min(100, Math.round(articles[0].similarity * 100));
+};
+
+const parseCitedSources = (answerText, articles) =>
+  articles.filter((a) =>
+    answerText.toLowerCase().includes(a.title.toLowerCase()),
+  );
+
+// TODO: chunked embeddings — articles currently stored
+// as single vectors. Broad questions suffer because
+// dense articles average across all topics.
+// Next improvement: chunk articles at ~150 words
+// with 30-word overlap, embed each chunk separately.
+
+// POST /api/copilot/query — expand query, embed variants, retrieve and merge, generate answer
 router.post("/query", async (req, res, next) => {
   try {
     const { question } = req.body;
@@ -20,15 +48,54 @@ router.post("/query", async (req, res, next) => {
       });
     }
 
-    const articles = await retrieveArticles(question.trim());
+    const q = question.trim();
+    const questionType = detectQuestionType(q);
+    const matchCount = questionType === "broad" ? 7 : 3;
+    const matchThreshold = questionType === "broad" ? 0.35 : 0.4;
+
+    // Expand query into multiple variants for broader retrieval coverage
+    const queries = await expandQuery(q);
+
+    // Embed all query variants in parallel
+    const embeddings = await Promise.all(queries.map((qv) => generateEmbedding(qv)));
+
+    // Search with each embedding in parallel
+    const allResults = await Promise.all(
+      embeddings.map((embedding) =>
+        supabase.rpc("match_articles", {
+          query_embedding: embedding,
+          match_threshold: matchThreshold,
+          match_count: matchCount,
+        }),
+      ),
+    );
+
+    // Merge and deduplicate — keep highest similarity per article
+    const seen = new Map();
+    for (const { data, error } of allResults) {
+      if (error || !data) continue;
+      for (const article of data) {
+        const existing = seen.get(article.id);
+        if (!existing || article.similarity > existing.similarity) {
+          seen.set(article.id, article);
+        }
+      }
+    }
+
+    // Sort by similarity descending, cap at matchCount
+    const rawArticles = Array.from(seen.values())
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, matchCount);
+
+    const articles = await enrichWithNames(rawArticles);
 
     let answer = null;
     let confidence = 0;
 
     if (articles.length > 0) {
-      const prompt = buildCopilotPrompt(question.trim(), articles);
+      const prompt = buildCopilotPrompt(q, articles, questionType);
       answer = await answerFromContext(prompt);
-      confidence = articles[0].similarity ?? 0;
+      confidence = calculateConfidence(articles);
     }
 
     // Gemini may return gap language even when articles were retrieved —
@@ -42,21 +109,20 @@ router.post("/query", async (req, res, next) => {
       confidence = 0;
     }
 
-    const sources = isGap
-      ? []
-      : articles.map((a) => ({
-          id: a.id,
-          title: a.title,
-          captured_by_name: a.captured_by_name,
-          created_at: a.created_at,
-          similarity: a.similarity,
-        }));
+    const cited = isGap ? [] : parseCitedSources(answer, articles);
+    const sources = cited.map((a) => ({
+      id: a.id,
+      title: a.title,
+      captured_by_name: a.captured_by_name,
+      created_at: a.created_at,
+      similarity: a.similarity,
+    }));
 
     const { data: saved, error: saveErr } = await supabase
       .from("copilot_queries")
       .insert({
         employee_id: req.employee.id,
-        question: question.trim(),
+        question: q,
         answer,
         source_article_ids: articles.map((a) => a.id),
         confidence_score: confidence,

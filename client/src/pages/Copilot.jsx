@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import AIAvatar from "../components/ui/AIAvatar.jsx";
 import Sidebar from "../components/ui/Sidebar.jsx";
 import { queryCopilot, submitFeedback } from "../lib/api.js";
+
+const stripSources = (text) =>
+  text
+    .split("\n")
+    .filter((line) => !line.trim().toLowerCase().startsWith("source:"))
+    .join("\n")
+    .trim();
 
 const SourceTag = ({ title, name }) => (
   <span
@@ -13,22 +22,19 @@ const SourceTag = ({ title, name }) => (
   </span>
 );
 
-const ConfidenceBar = ({ confidence }) => {
-  const pct = Math.round(confidence * 100);
-  return (
-    <div className="flex items-center gap-3 mt-4">
-      <div className="flex-1 bg-rule" style={{ height: 1.5 }}>
-        <div
-          className="bg-ink h-full transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
-        {pct}% confidence
-      </span>
+const ConfidenceBar = ({ confidence }) => (
+  <div className="flex items-center gap-3 mt-4">
+    <div className="flex-1 bg-rule" style={{ height: 1.5 }}>
+      <div
+        className="bg-ink h-full transition-all duration-500"
+        style={{ width: `${confidence}%`, maxWidth: "100%" }}
+      />
     </div>
-  );
-};
+    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
+      {confidence}% confidence
+    </span>
+  </div>
+);
 
 const FeedbackRow = ({ queryId, currentFeedback, onFeedback }) => {
   if (!queryId) return null;
@@ -89,12 +95,54 @@ const AnswerCard = ({ item, onFeedback }) => {
       {item.answer ? (
         <>
           {/* Answer */}
-          <p
-            className="font-body font-light text-ink-2"
-            style={{ fontSize: 14, lineHeight: 1.75, whiteSpace: "pre-wrap" }}
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ({ children }) => (
+                <p className="font-body font-light text-sm text-ink-2 leading-[1.75] mb-3 last:mb-0">
+                  {children}
+                </p>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-medium text-ink">{children}</strong>
+              ),
+              em: ({ children }) => <em className="italic">{children}</em>,
+              h2: ({ children }) => (
+                <h2
+                  className="font-display text-ink mt-5 mb-2 leading-tight"
+                  style={{ fontWeight: 200, fontSize: 18, letterSpacing: "-0.01em" }}
+                >
+                  {children}
+                </h2>
+              ),
+              h3: ({ children }) => (
+                <h3
+                  className="font-display text-ink mt-4 mb-2 leading-tight"
+                  style={{ fontWeight: 200, fontSize: 15 }}
+                >
+                  {children}
+                </h3>
+              ),
+              ul: ({ children }) => (
+                <ul className="list-disc pl-5 mb-3 space-y-1">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-5 mb-3 space-y-1">{children}</ol>
+              ),
+              li: ({ children }) => (
+                <li className="font-body font-light text-sm text-ink-2 leading-[1.65]">
+                  {children}
+                </li>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-rule-hi pl-4 my-3 text-ink-3 italic">
+                  {children}
+                </blockquote>
+              ),
+            }}
           >
-            {item.answer}
-          </p>
+            {stripSources(item.answer)}
+          </ReactMarkdown>
 
           {/* Sources */}
           {item.sources.length > 0 && (
