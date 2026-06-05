@@ -974,6 +974,16 @@ Gap state works and links to starting a new session.
 
 ### 08 — Manager View
 
+**Manager account setup — Phase 1:**
+Set `is_manager = true` directly in Supabase for any manager account.
+No registration UI change needed. Run in Supabase SQL editor:
+`UPDATE employees SET is_manager = true WHERE email = 'manager@company.com';`
+
+**Planned for later (not Phase 1):**
+Option C — manager sends invite link → employee registers via invite →
+account created under that manager's team with a proper approval flow.
+Do not build this now.
+
 ```
 □ Manager route guard — check is_manager=true, redirect if not
 
