@@ -135,7 +135,24 @@ const SessionsList = () => {
         )}
 
         {error && !loading && (
-          <p className="font-body font-light text-sm text-ink-2">{error}</p>
+          <div className="bg-white border border-rule px-8 py-10 text-center">
+            <p className="font-body font-light text-sm mb-4" style={{ color: "var(--danger)" }}>
+              {error}
+            </p>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                listSessions()
+                  .then(({ data }) => setSessions(data.data.sessions))
+                  .catch(() => setError("Something went wrong — try again."))
+                  .finally(() => setLoading(false));
+              }}
+              className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+            >
+              Try again →
+            </button>
+          </div>
         )}
 
         {!loading && !error && sessions.length === 0 && (

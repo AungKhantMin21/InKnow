@@ -269,9 +269,17 @@ const Manager = () => {
           </div>
 
           {error && (
-            <p className="font-body text-sm mb-6" style={{ color: "var(--danger)" }}>
-              {error}
-            </p>
+            <div className="mb-6">
+              <p className="font-body font-light text-sm mb-2" style={{ color: "var(--danger)" }}>
+                {error}
+              </p>
+              <button
+                onClick={load}
+                className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+              >
+                Try again →
+              </button>
+            </div>
           )}
 
           {/* Stats */}

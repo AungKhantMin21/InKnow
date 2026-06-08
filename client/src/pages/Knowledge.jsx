@@ -176,9 +176,27 @@ const Knowledge = () => {
         </div>
 
         {error && (
-          <p className="font-body text-sm mb-6" style={{ color: "var(--danger)" }}>
-            {error}
-          </p>
+          <div className="mb-6">
+            <p className="font-body font-light text-sm mb-2" style={{ color: "var(--danger)" }}>
+              {error}
+            </p>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                const params = {};
+                if (selectedRole) params.role_id = selectedRole;
+                if (search.trim()) params.search = search.trim();
+                getArticles(params)
+                  .then(({ data }) => setArticles(data.data.articles))
+                  .catch(() => setError("Something went wrong — try again."))
+                  .finally(() => setLoading(false));
+              }}
+              className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+            >
+              Try again →
+            </button>
+          </div>
         )}
 
         {loading && (
