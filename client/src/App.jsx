@@ -9,11 +9,20 @@ import ArticleReview from "./pages/ArticleReview.jsx";
 import Knowledge from "./pages/Knowledge.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
 import Copilot from "./pages/Copilot.jsx";
+import Manager from "./pages/Manager.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null;
   return user ? children : <Navigate to="/login" replace />;
+};
+
+const ManagerRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.is_manager) return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
 const AppRoutes = () => {
@@ -96,6 +105,14 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <Copilot />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manager"
+        element={
+          <ManagerRoute>
+            <Manager />
+          </ManagerRoute>
         }
       />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
