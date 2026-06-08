@@ -1198,8 +1198,8 @@ and understood what to do.
 ✓ 07 — Copilot (with multi-query RAG, detectQuestionType, query expansion)
 ✓ 08 — Manager View (with soft delete, full article review before approve/reject)
 ✓ 09 — Loading + Error + Empty States
-□ 10 — Polish Pass           ← NEXT
-□ 11 — Deploy
+✓ 10 — Polish Pass
+□ 11 — Deploy                ← NEXT
 □ 12 — Internal Launch
 ```
 
