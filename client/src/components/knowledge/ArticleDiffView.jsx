@@ -22,7 +22,7 @@ const getStartLine = (changes, targetId) => {
 
 const GUTTER = {
   unchanged: { rowBg: "var(--white)",        gutterBg: "var(--ground)",             gutterBorder: "var(--rule)",               glyph: "·", glyphColor: "var(--ink-4)"  },
-  removed:   { rowBg: "#FDF0F0",             gutterBg: "rgba(139,26,26,0.08)",      gutterBorder: "rgba(139,26,26,0.3)",       glyph: "−", glyphColor: "var(--danger)" },
+  removed:   { rowBg: "var(--danger-light)", gutterBg: "rgba(139,26,26,0.08)",      gutterBorder: "rgba(139,26,26,0.3)",       glyph: "−", glyphColor: "var(--danger)" },
   added:     { rowBg: "var(--forest-light)", gutterBg: "rgba(26,107,69,0.08)",      gutterBorder: "rgba(26,107,69,0.3)",       glyph: "+", glyphColor: "var(--forest)" },
 };
 
@@ -290,7 +290,7 @@ const ArticleDiffView = ({ article, proposedUpdate, onApply, onKeep, saving, err
         <>
           {/* Diff stats bar */}
           <div className="flex items-center gap-4 mb-3">
-            <StatChip color="var(--danger)" bg="#FDF0F0" count={removedCount} label="removed" faded={removedCount === 0} />
+            <StatChip color="var(--danger)" bg="var(--danger-light)" count={removedCount} label="removed" faded={removedCount === 0} />
             <span style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)", fontSize: 10 }}>·</span>
             <StatChip color="var(--forest)" bg="var(--forest-light)" count={addedCount} label="added" faded={false} />
             <span style={{ color: "var(--ink-4)", fontFamily: "var(--font-mono)", fontSize: 10 }}>·</span>

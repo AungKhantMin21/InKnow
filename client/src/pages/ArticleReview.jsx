@@ -286,11 +286,11 @@ const ArticleReview = () => {
               {current.update_reason && (
                 <div
                   className="mb-6 px-4 py-3"
-                  style={{ background: "var(--volt-light)", borderLeft: "2px solid var(--volt)" }}
+                  style={{ background: "var(--amber-light)", borderLeft: "2px solid var(--amber)" }}
                 >
                   <p
                     className="font-mono mb-1"
-                    style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--volt)" }}
+                    style={{ fontSize: 8, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--amber)" }}
                   >
                     Why this is being updated
                   </p>
