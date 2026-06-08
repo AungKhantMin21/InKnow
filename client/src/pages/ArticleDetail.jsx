@@ -251,11 +251,11 @@ const ArticleDetail = () => {
         <Sidebar />
         <main className="flex-1 flex justify-center px-8 py-12">
           <div style={{ maxWidth: 720, width: "100%" }}>
-            <div className="h-4 bg-ground w-24 mb-10" />
-            <div className="h-8 bg-ground w-2/3 mb-4" />
-            <div className="h-4 bg-ground w-full mb-2" />
-            <div className="h-4 bg-ground w-5/6 mb-2" />
-            <div className="h-4 bg-ground w-3/4" />
+            <div className="h-4 bg-ground w-24 mb-10" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+            <div className="h-8 bg-ground w-2/3 mb-4" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+            <div className="h-4 bg-ground w-full mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+            <div className="h-4 bg-ground w-5/6 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+            <div className="h-4 bg-ground w-3/4" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
           </div>
         </main>
       </div>

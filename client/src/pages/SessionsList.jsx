@@ -127,8 +127,8 @@ const SessionsList = () => {
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-white border border-rule p-5">
-                <div className="h-4 bg-ground w-1/2 mb-2" />
-                <div className="h-3 bg-ground w-1/3" />
+                <div className="h-4 bg-ground w-1/2 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+                <div className="h-3 bg-ground w-1/3" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
               </div>
             ))}
           </div>

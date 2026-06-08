@@ -48,7 +48,7 @@ const Login = () => {
     "w-full border border-rule bg-surface font-body font-light text-sm text-ink px-3 py-2.5 outline-none focus:border-rule-hi transition-colors placeholder:text-ink-4";
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4" style={{ animation: "pageFade 200ms ease" }}>
       <div
         className="bg-white border border-rule w-full p-10"
         style={{ maxWidth: 400 }}

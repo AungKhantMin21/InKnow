@@ -43,8 +43,8 @@ const StatCard = ({ value, label }) => (
 
 const StatSkeleton = () => (
   <div className="bg-white border border-rule px-6 py-5">
-    <div className="bg-ground h-9 w-14 mb-2" style={{ animation: "pageFade 600ms ease infinite alternate" }} />
-    <div className="bg-ground h-2.5 w-28" />
+    <div className="bg-ground h-9 w-14 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="bg-ground h-2.5 w-28" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
   </div>
 );
 
@@ -110,10 +110,10 @@ const CoverageCard = ({ role, maxArticles }) => {
 
 const CoverageSkeleton = () => (
   <div className="bg-white border border-rule p-5">
-    <div className="bg-ground h-4 w-36 mb-4" />
-    <div className="bg-ground h-7 w-8 mb-2" />
-    <div className="bg-ground w-full mb-4" style={{ height: 2 }} />
-    <div className="bg-ground h-2.5 w-24" />
+    <div className="bg-ground h-4 w-36 mb-4" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="bg-ground h-7 w-8 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="bg-ground w-full mb-4" style={{ height: 2, animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="bg-ground h-2.5 w-24" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
   </div>
 );
 
@@ -155,12 +155,12 @@ const PendingRow = ({ article, onView, onApprove, onReject, approving, rejecting
 const PendingSkeleton = () => (
   <div className="flex items-center justify-between py-4 border-b border-rule last:border-0">
     <div>
-      <div className="bg-ground h-4 w-60 mb-2" />
-      <div className="bg-ground h-2.5 w-40" />
+      <div className="bg-ground h-4 w-60 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+      <div className="bg-ground h-2.5 w-40" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
     </div>
     <div className="flex gap-2">
-      <div className="bg-ground h-8 w-20" />
-      <div className="bg-ground h-8 w-16" />
+      <div className="bg-ground h-8 w-20" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+      <div className="bg-ground h-8 w-16" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
     </div>
   </div>
 );

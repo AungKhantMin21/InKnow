@@ -16,9 +16,9 @@ const formatDate = (iso) => {
 
 const SkeletonRow = () => (
   <div className="flex items-center gap-4 px-6 py-4 border-b border-rule last:border-0">
-    <div className="h-4 bg-ground w-24 flex-shrink-0" />
-    <div className="h-3 bg-ground flex-1" />
-    <div className="h-3 bg-ground w-16" />
+    <div className="h-4 bg-ground w-24 flex-shrink-0" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="h-3 bg-ground flex-1" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="h-3 bg-ground w-16" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
   </div>
 );
 
