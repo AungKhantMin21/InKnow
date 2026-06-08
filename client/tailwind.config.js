@@ -19,6 +19,8 @@ export default {
         "forest-light": "#E8F4EE",
         amber: "#8B5200",
         "amber-light": "#FDF3E7",
+        danger: "#8B1A1A",
+        "danger-light": "#FDF0F0",
       },
       fontFamily: {
         display: ["Fraunces", "serif"],
