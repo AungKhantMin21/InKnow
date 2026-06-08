@@ -257,7 +257,6 @@ router.post("/:id/message", async (req, res, next) => {
       message: null,
     });
   } catch (err) {
-    console.log("SESSIONS ROUTE CATCH:", err.status, err.message?.slice(0, 200));
     next(err);
   }
 });

@@ -122,7 +122,7 @@ const PendingRow = ({ article, onView, onApprove, onReject, approving, rejecting
     <div className="flex-1 min-w-0">
       <button
         onClick={onView}
-        className="font-body font-light text-sm text-ink hover:text-volt transition-colors truncate block text-left w-full"
+        className="font-body font-light text-sm text-ink hover:text-ink-2 transition-colors truncate block text-left w-full"
       >
         {article.title}
       </button>
