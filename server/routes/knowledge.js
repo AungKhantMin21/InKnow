@@ -69,15 +69,18 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// GET /api/knowledge/:id — return one article and increment its view count
+// GET /api/knowledge/:id — return one article; managers can view pending articles
 router.get("/:id", async (req, res, next) => {
   try {
-    const { data: article, error } = await supabase
+    let query = supabase
       .from("knowledge_articles")
       .select("*, roles(name), capturer:employees!captured_by(name)")
-      .eq("id", req.params.id)
-      .eq("approved", true)
-      .single();
+      .eq("id", req.params.id);
+
+    // Non-managers only see approved articles
+    if (!req.employee.is_manager) query = query.eq("approved", true);
+
+    const { data: article, error } = await query.single();
 
     if (error || !article) {
       return res.status(404).json({
@@ -87,13 +90,15 @@ router.get("/:id", async (req, res, next) => {
       });
     }
 
-    // Increment view count — non-blocking, failure is acceptable
-    supabase
-      .from("knowledge_articles")
-      .update({ view_count: (article.view_count || 0) + 1 })
-      .eq("id", req.params.id)
-      .then(() => {})
-      .catch(() => {});
+    // Only increment view count for approved articles
+    if (article.approved) {
+      supabase
+        .from("knowledge_articles")
+        .update({ view_count: (article.view_count || 0) + 1 })
+        .eq("id", req.params.id)
+        .then(() => {})
+        .catch(() => {});
+    }
 
     res.json({ data: { article }, error: null, message: null });
   } catch (err) {
@@ -210,6 +215,66 @@ router.post("/update", async (req, res, next) => {
     if (updateErr) throw updateErr;
 
     res.json({ data: { article: updated }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/knowledge/:id/approve — manager only
+router.patch("/:id/approve", async (req, res, next) => {
+  try {
+    if (!req.employee.is_manager) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { data: article, error } = await supabase
+      .from("knowledge_articles")
+      .update({
+        approved: true,
+        approved_by: req.employee.id,
+        approved_at: new Date().toISOString(),
+      })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error || !article) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    res.json({ data: { article }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/knowledge/:id/reject — manager only, soft delete
+router.patch("/:id/reject", async (req, res, next) => {
+  try {
+    if (!req.employee.is_manager) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { error } = await supabase
+      .from("knowledge_articles")
+      .update({ rejected: true })
+      .eq("id", req.params.id);
+
+    if (error) throw error;
+
+    res.json({ data: null, error: null, message: null });
   } catch (err) {
     next(err);
   }

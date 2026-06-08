@@ -37,6 +37,13 @@ export const updateArticle = (id, data) => api.patch(`/api/knowledge/${id}`, dat
 export const getSessionArticles = (id) => api.get(`/api/sessions/${id}/articles`);
 export const updateKnowledgeArticle = (data) => api.post("/api/knowledge/update", data);
 
+// Manager
+export const getManagerStats = () => api.get("/api/manager/stats");
+export const getManagerCoverage = () => api.get("/api/manager/coverage");
+export const getPendingArticles = () => api.get("/api/manager/pending");
+export const approveArticle = (id) => api.patch(`/api/knowledge/${id}/approve`);
+export const rejectArticle = (id) => api.patch(`/api/knowledge/${id}/reject`);
+
 // Copilot
 export const queryCopilot = (question) => api.post("/api/copilot/query", { question });
 export const submitFeedback = (query_id, feedback) => api.post("/api/copilot/feedback", { query_id, feedback });

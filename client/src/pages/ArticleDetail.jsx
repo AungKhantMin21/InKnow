@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/ui/Sidebar.jsx";
-import { getArticle, updateArticle } from "../lib/api.js";
+import { getArticle, updateArticle, approveArticle, rejectArticle } from "../lib/api.js";
 import { markdownToHtml, htmlToMarkdown } from "../lib/markdown.js";
 
 const markdownComponents = {
@@ -162,7 +162,10 @@ const Toolbar = ({ editor }) => {
 const ArticleDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+
+  const fromManager = location.state?.from === "manager";
 
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -172,6 +175,9 @@ const ArticleDetail = () => {
   const [editSummary, setEditSummary] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
 
   const editor = useEditor({
     extensions: [StarterKit, Placeholder.configure({ placeholder: "Article content…" })],
@@ -211,6 +217,30 @@ const ArticleDetail = () => {
       setSaveError("Something went wrong — try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    setApproving(true);
+    setReviewError(null);
+    try {
+      await approveArticle(id);
+      navigate("/manager");
+    } catch {
+      setReviewError("Something went wrong — try again.");
+      setApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setRejecting(true);
+    setReviewError(null);
+    try {
+      await rejectArticle(id);
+      navigate("/manager");
+    } catch {
+      setReviewError("Something went wrong — try again.");
+      setRejecting(false);
     }
   };
 
@@ -269,17 +299,28 @@ const ArticleDetail = () => {
         {/* Topbar */}
         <div className="bg-white border-b border-rule flex items-center px-8 gap-4 flex-shrink-0" style={{ height: 52 }}>
           <button
-            onClick={() => navigate("/knowledge")}
+            onClick={() => navigate(fromManager ? "/manager" : "/knowledge")}
             className="font-body font-light text-xs text-ink-3 hover:text-ink transition-colors"
           >
-            ← Knowledge
+            {fromManager ? "← Manager" : "← Knowledge"}
           </button>
           <div className="w-px h-4 bg-rule" />
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">
             {article.roles?.name || ""}
           </span>
+          {!article.approved && !article.rejected && (
+            <>
+              <div className="w-px h-4 bg-rule" />
+              <span
+                className="font-mono text-[9px] tracking-[0.14em] uppercase px-2 py-0.5"
+                style={{ color: "var(--amber)", background: "var(--amber-light)" }}
+              >
+                Pending approval
+              </span>
+            </>
+          )}
           <div className="flex-1" />
-          {isAuthor && mode === "view" && (
+          {isAuthor && mode === "view" && article.approved && (
             <button
               onClick={enterEditMode}
               className="flex items-center gap-1.5 font-body font-light text-xs text-ink-3 hover:text-ink transition-colors"
@@ -291,7 +332,7 @@ const ArticleDetail = () => {
         </div>
 
         {/* Content */}
-        <main className="flex justify-center px-8 py-12" style={{ paddingBottom: mode === "edit" ? 100 : 80 }}>
+        <main className="flex justify-center px-8 py-12" style={{ paddingBottom: (mode === "edit" || (user?.is_manager && !article.approved && !article.rejected)) ? 100 : 80 }}>
           <div style={{ maxWidth: 720, width: "100%" }}>
 
             {/* Meta */}
@@ -370,6 +411,39 @@ const ArticleDetail = () => {
 
           </div>
         </main>
+
+        {/* Manager review bar — shown when viewing a pending article */}
+        {user?.is_manager && !article.approved && !article.rejected && mode === "view" && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-rule z-10">
+            <div className="flex items-center px-8 py-4" style={{ maxWidth: "calc(720px + 64px + 224px)", margin: "0 auto" }}>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleApprove}
+                  disabled={approving || rejecting}
+                  className="font-body font-medium text-xs px-6 py-2.5 tracking-wider uppercase transition-opacity disabled:opacity-40"
+                  style={{ background: "var(--forest)", color: "var(--white)" }}
+                >
+                  {approving ? "Approving…" : "Approve"}
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={approving || rejecting}
+                  className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors disabled:opacity-40"
+                >
+                  {rejecting ? "Rejecting…" : "Reject"}
+                </button>
+              </div>
+              <div className="flex-1" />
+              {reviewError ? (
+                <p className="font-body text-xs" style={{ color: "var(--danger)" }}>{reviewError}</p>
+              ) : (
+                <span className="font-mono text-[10px] tracking-wider text-ink-4">
+                  Review before publishing to the knowledge base
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Edit bottom bar */}
         {mode === "edit" && (
