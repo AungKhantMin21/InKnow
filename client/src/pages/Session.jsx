@@ -381,8 +381,24 @@ const Session = () => {
   // ── Initializing ─────────────────────────────────────────────────────────
   if (initializing) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <p className="font-body font-light text-sm text-ink-3">Starting session…</p>
+      <div className="h-screen bg-surface flex flex-col" style={{ animation: "pageFade 200ms ease" }}>
+        <div className="bg-white border-b border-rule px-6 py-3 flex items-center gap-4 flex-shrink-0">
+          <div className="h-3 bg-ground w-16" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+          <div className="w-px h-4 bg-rule" />
+          <div className="h-3 bg-ground w-36" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+        </div>
+        <div className="flex flex-1 min-h-0">
+          <div className="flex flex-col flex-1 px-8 py-6 gap-5" style={{ flexBasis: "65%" }}>
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 bg-ground flex-shrink-0" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+              <div className="flex flex-col gap-2">
+                <div className="h-3 bg-ground w-64" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+                <div className="h-3 bg-ground w-48" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+              </div>
+            </div>
+          </div>
+          <div className="border-l border-rule bg-white flex-shrink-0" style={{ flexBasis: "35%" }} />
+        </div>
       </div>
     );
   }

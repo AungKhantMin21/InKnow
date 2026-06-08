@@ -27,6 +27,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const hour = new Date().getHours();
   const greeting =
@@ -35,7 +36,7 @@ const Dashboard = () => {
   useEffect(() => {
     listSessions()
       .then(({ data }) => setSessions(data.data.sessions.slice(0, 5)))
-      .catch(() => {})
+      .catch(() => setError("Something went wrong — try again."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -85,6 +86,28 @@ const Dashboard = () => {
             <div className="flex-1 h-px bg-rule" />
           </div>
 
+          {/* Error state */}
+          {!loading && error && (
+            <div className="bg-white border border-rule px-8 py-10 text-center">
+              <p className="font-body font-light text-sm mb-4" style={{ color: "var(--danger)" }}>
+                {error}
+              </p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setLoading(true);
+                  listSessions()
+                    .then(({ data }) => setSessions(data.data.sessions.slice(0, 5)))
+                    .catch(() => setError("Something went wrong — try again."))
+                    .finally(() => setLoading(false));
+                }}
+                className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+              >
+                Try again →
+              </button>
+            </div>
+          )}
+
           {/* Loading skeleton */}
           {loading && (
             <div className="bg-white border border-rule overflow-hidden">
@@ -95,7 +118,7 @@ const Dashboard = () => {
           )}
 
           {/* Sessions list */}
-          {!loading && sessions.length > 0 && (
+          {!loading && !error && sessions.length > 0 && (
             <div className="bg-white border border-rule overflow-hidden">
               {sessions.map((session) => {
                 const isActive = session.status === "active";
@@ -149,10 +172,10 @@ const Dashboard = () => {
           )}
 
           {/* Empty state */}
-          {!loading && sessions.length === 0 && (
+          {!loading && !error && sessions.length === 0 && (
             <div className="bg-white border border-rule px-8 py-10 text-center">
               <p className="font-body font-light text-sm text-ink-3">
-                No knowledge captured yet.
+                You haven't captured any knowledge yet.
               </p>
               <button
                 onClick={() => navigate("/sessions/new")}

@@ -13,14 +13,14 @@ const getFreshness = (createdAt) => {
 const SkeletonCard = () => (
   <div className="bg-white border border-rule p-5">
     <div className="flex items-center justify-between mb-3">
-      <div className="h-5 bg-ground w-20" style={{ animation: "pulse 1.5s ease infinite" }} />
+      <div className="h-5 bg-ground w-20" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
     </div>
-    <div className="h-4 bg-ground w-3/4 mb-2" style={{ animation: "pulse 1.5s ease infinite" }} />
-    <div className="h-3 bg-ground w-full mb-1" style={{ animation: "pulse 1.5s ease infinite" }} />
-    <div className="h-3 bg-ground w-2/3 mb-6" style={{ animation: "pulse 1.5s ease infinite" }} />
+    <div className="h-4 bg-ground w-3/4 mb-2" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="h-3 bg-ground w-full mb-1" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+    <div className="h-3 bg-ground w-2/3 mb-6" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
     <div className="border-t border-rule pt-3 flex justify-between">
-      <div className="h-3 bg-ground w-20" style={{ animation: "pulse 1.5s ease infinite" }} />
-      <div className="h-3 bg-ground w-16" style={{ animation: "pulse 1.5s ease infinite" }} />
+      <div className="h-3 bg-ground w-20" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+      <div className="h-3 bg-ground w-16" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
     </div>
   </div>
 );
