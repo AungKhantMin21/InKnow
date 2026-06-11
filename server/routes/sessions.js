@@ -18,33 +18,25 @@ router.use(auth);
 // POST /api/sessions — create session and generate AI opening message
 router.post("/", async (req, res, next) => {
   try {
-    const employeeId = req.employee.id;
-
-    const { data: employee, error: empErr } = await supabase
-      .from("employees")
-      .select("name, role_id, roles(name)")
-      .eq("id", employeeId)
-      .single();
-
-    if (empErr || !employee) {
-      return res.status(404).json({
+    if (!req.employee.group_id) {
+      return res.status(400).json({
         data: null,
-        error: "Not found",
-        message: "We couldn't find that. Try going back.",
+        error: "No group",
+        message: "You need to join a group before starting a session.",
       });
     }
 
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .insert({ employee_id: employeeId, role_id: employee.role_id })
+      .insert({ employee_id: req.employee.id, group_id: req.employee.group_id })
       .select()
       .single();
 
     if (sessionErr) throw sessionErr;
 
     const systemPrompt = buildInterrogationSystemPrompt(
-      employee.name,
-      employee.roles.name,
+      req.employee.name,
+      req.employee.job_title || "employee",
     );
 
     const openingText = await sendInterrogationMessage(systemPrompt, [], "begin");
@@ -72,7 +64,7 @@ router.get("/", async (req, res, next) => {
   try {
     const { data: sessions, error } = await supabase
       .from("interrogation_sessions")
-      .select("id, status, title, role_id, started_at, completed_at, last_completed_at, roles(name)")
+      .select("id, status, title, group_id, started_at, completed_at, last_completed_at, groups(name)")
       .eq("employee_id", req.employee.id)
       .order("started_at", { ascending: false });
 
@@ -169,7 +161,7 @@ router.post("/:id/message", async (req, res, next) => {
 
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("id, status, role_id, employee_id, message_count, title, last_completion_message_id, employees(name, roles(name))")
+      .select("id, status, group_id, employee_id, message_count, title, last_completion_message_id")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -191,8 +183,8 @@ router.post("/:id/message", async (req, res, next) => {
     if (histErr) throw histErr;
 
     const systemPrompt = buildInterrogationSystemPrompt(
-      session.employees.name,
-      session.employees.roles.name,
+      req.employee.name,
+      req.employee.job_title || "employee",
     );
 
     const aiText = await sendInterrogationMessage(
@@ -266,7 +258,7 @@ router.post("/:id/complete", async (req, res, next) => {
   try {
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("*, roles(name), employees(name)")
+      .select("*")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -288,17 +280,17 @@ router.post("/:id/complete", async (req, res, next) => {
     if (msgErr) throw msgErr;
 
     const conversation = formatConversation(messages);
-    const roleName = session.roles?.name || "employee";
+    const jobTitle = req.employee.job_title || "employee";
     const lastMessage = messages[messages.length - 1];
 
     // ── PATH A: First completion ──────────────────────────────────────────
     if (session.status === "active") {
       let articles = [];
-      let title = session.title || `${roleName} Session`;
+      let title = session.title || `${jobTitle} Session`;
 
       try {
         [articles, title] = await Promise.all([
-          generateArticles(buildArticleGenerationPrompt(conversation, roleName)),
+          generateArticles(buildArticleGenerationPrompt(conversation, jobTitle)),
           generateSessionTitle(conversation),
         ]);
       } catch (genErr) {
@@ -402,7 +394,6 @@ router.post("/:id/complete", async (req, res, next) => {
       });
     }
 
-    // Unexpected status
     return res.status(400).json({
       data: null,
       error: "Cannot complete session",
@@ -418,7 +409,7 @@ router.post("/:id/articles", async (req, res, next) => {
   try {
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("*, roles(name)")
+      .select("*")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -440,7 +431,10 @@ router.post("/:id/articles", async (req, res, next) => {
     if (msgErr) throw msgErr;
 
     const conversation = formatConversation(messages);
-    const prompt = buildArticleGenerationPrompt(conversation, session.roles?.name || "employee");
+    const prompt = buildArticleGenerationPrompt(
+      conversation,
+      req.employee.job_title || "employee",
+    );
     const articles = await generateArticles(prompt);
 
     res.json({ data: { articles }, error: null, message: null });

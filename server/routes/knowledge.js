@@ -9,7 +9,7 @@ router.use(auth);
 // POST /api/knowledge — save a reviewed article with its embedding
 router.post("/", async (req, res, next) => {
   try {
-    const { role_id, session_id, title, summary, content, tags } = req.body;
+    const { session_id, title, summary, content, tags } = req.body;
 
     if (!title?.trim() || !content?.trim()) {
       return res.status(400).json({
@@ -25,7 +25,7 @@ router.post("/", async (req, res, next) => {
     const { data: article, error } = await supabase
       .from("knowledge_articles")
       .insert({
-        role_id,
+        group_id: req.employee.group_id,
         session_id,
         title: title.trim(),
         summary: summary?.trim() || null,
@@ -46,18 +46,27 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// GET /api/knowledge — list approved articles with optional role_id and search filters
+// GET /api/knowledge — list approved articles scoped to own group + public
 router.get("/", async (req, res, next) => {
   try {
-    const { role_id, search } = req.query;
+    const { group_id, search } = req.query;
 
     let query = supabase
       .from("knowledge_articles")
-      .select("id, title, summary, tags, role_id, captured_by, view_count, created_at, roles(name), capturer:employees!captured_by(name)")
+      .select(
+        "id, title, summary, tags, group_id, visibility, is_core, captured_by, view_count, created_at, groups(name), capturer:employees!captured_by(name)",
+      )
       .eq("approved", true)
+      .eq("rejected", false)
       .order("created_at", { ascending: false });
 
-    if (role_id) query = query.eq("role_id", role_id);
+    if (req.employee.group_id) {
+      query = query.or(`group_id.eq.${req.employee.group_id},visibility.eq.public`);
+    } else {
+      query = query.eq("visibility", "public");
+    }
+
+    if (group_id) query = query.eq("group_id", group_id);
     if (search) query = query.ilike("title", `%${search}%`);
 
     const { data, error } = await query;
@@ -69,16 +78,28 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// GET /api/knowledge/:id — return one article; managers can view pending articles
+// GET /api/knowledge/:id — return one article with group scoping enforced
 router.get("/:id", async (req, res, next) => {
   try {
     let query = supabase
       .from("knowledge_articles")
-      .select("*, roles(name), capturer:employees!captured_by(name)")
+      .select("*, groups(name), capturer:employees!captured_by(name)")
       .eq("id", req.params.id);
 
-    // Non-managers only see approved articles
-    if (!req.employee.is_manager) query = query.eq("approved", true);
+    if (req.employee.is_manager && req.employee.group_id) {
+      // Managers can see their own group's articles (all approval states) + approved public
+      query = query.or(
+        `group_id.eq.${req.employee.group_id},visibility.eq.public`,
+      );
+    } else if (req.employee.group_id) {
+      // Employees see approved only, own group + public
+      query = query.eq("approved", true).or(
+        `group_id.eq.${req.employee.group_id},visibility.eq.public`,
+      );
+    } else {
+      // Admin without group: approved public articles only
+      query = query.eq("approved", true).eq("visibility", "public");
+    }
 
     const { data: article, error } = await query.single();
 
@@ -90,7 +111,6 @@ router.get("/:id", async (req, res, next) => {
       });
     }
 
-    // Only increment view count for approved articles
     if (article.approved) {
       supabase
         .from("knowledge_articles")
@@ -239,6 +259,7 @@ router.patch("/:id/approve", async (req, res, next) => {
         approved_at: new Date().toISOString(),
       })
       .eq("id", req.params.id)
+      .eq("group_id", req.employee.group_id)
       .select()
       .single();
 
@@ -270,7 +291,8 @@ router.patch("/:id/reject", async (req, res, next) => {
     const { error } = await supabase
       .from("knowledge_articles")
       .update({ rejected: true })
-      .eq("id", req.params.id);
+      .eq("id", req.params.id)
+      .eq("group_id", req.employee.group_id);
 
     if (error) throw error;
 

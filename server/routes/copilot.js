@@ -77,13 +77,14 @@ router.post("/query", async (req, res, next) => {
     // Embed all query variants in parallel
     const embeddings = await Promise.all(queries.map((qv) => generateEmbedding(qv)));
 
-    // Search with each embedding in parallel
+    // Search with each embedding in parallel — scoped to own group + public
     const allResults = await Promise.all(
       embeddings.map((embedding) =>
         supabase.rpc("match_articles", {
           query_embedding: embedding,
           match_threshold: matchThreshold,
           match_count: matchCount,
+          requesting_group: req.employee.group_id || null,
         }),
       ),
     );
