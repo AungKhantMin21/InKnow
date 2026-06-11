@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import supabase from "./db/supabase.js";
 import authRoutes from "./routes/auth.js";
-import rolesRoutes from "./routes/roles.js";
 import sessionsRoutes from "./routes/sessions.js";
 import knowledgeRoutes from "./routes/knowledge.js";
 import copilotRoutes from "./routes/copilot.js";
@@ -21,7 +20,6 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/roles", rolesRoutes);
 app.use("/api/sessions", sessionsRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/copilot", copilotRoutes);
@@ -30,14 +28,14 @@ app.use("/api/manager", managerRoutes);
 app.use(errorHandler);
 
 async function start() {
-  const { data, error } = await supabase.from("roles").select("id, name");
+  const { data, error } = await supabase.from("groups").select("id");
 
   if (error) {
     console.error("DB connection failed:", error.message);
     process.exit(1);
   }
 
-  console.log(`DB connected — ${data.length} roles loaded`);
+  console.log(`DB connected — ${data.length} groups loaded`);
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
