@@ -123,6 +123,15 @@ const AppRoutes = () => {
           </ManagerRoute>
         }
       />
+      {/* Admin portal — pages added in Step 04 */}
+      <Route
+        path="/admin/*"
+        element={
+          <AdminRoute>
+            <Navigate to="/dashboard" replace />
+          </AdminRoute>
+        }
+      />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
     </Routes>
   );
