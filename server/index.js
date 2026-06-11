@@ -7,6 +7,9 @@ import sessionsRoutes from "./routes/sessions.js";
 import knowledgeRoutes from "./routes/knowledge.js";
 import copilotRoutes from "./routes/copilot.js";
 import managerRoutes from "./routes/manager.js";
+import groupsRoutes from "./routes/groups.js";
+import invitesRoutes from "./routes/invites.js";
+import adminRoutes from "./routes/admin.js";
 import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
@@ -24,6 +27,9 @@ app.use("/api/sessions", sessionsRoutes);
 app.use("/api/knowledge", knowledgeRoutes);
 app.use("/api/copilot", copilotRoutes);
 app.use("/api/manager", managerRoutes);
+app.use("/api/groups", groupsRoutes);
+app.use("/api/invites", invitesRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(errorHandler);
 

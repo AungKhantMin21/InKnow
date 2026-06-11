@@ -45,4 +45,33 @@ export const rejectArticle = (id) => api.patch(`/api/knowledge/${id}/reject`);
 export const queryCopilot = (question) => api.post("/api/copilot/query", { question });
 export const submitFeedback = (query_id, feedback) => api.post("/api/copilot/feedback", { query_id, feedback });
 
+// Groups (admin)
+export const getGroups = () => api.get("/api/groups");
+export const createGroup = (data) => api.post("/api/groups", data);
+export const updateGroup = (id, data) => api.patch(`/api/groups/${id}`, data);
+export const archiveGroup = (id) => api.patch(`/api/groups/${id}/archive`);
+export const getGroupMembers = (id) => api.get(`/api/groups/${id}/members`);
+export const addGroupMember = (groupId, employee_id) =>
+  api.post(`/api/groups/${groupId}/members`, { employee_id });
+export const removeGroupMember = (groupId, employeeId) =>
+  api.delete(`/api/groups/${groupId}/members/${employeeId}`);
+export const createGroupInvite = (groupId, data) =>
+  api.post(`/api/groups/${groupId}/invites`, data);
+
+// Invites
+export const getInvite = (token) => api.get(`/api/invites/${token}`);
+export const acceptInvite = (token) => api.post(`/api/invites/${token}/accept`);
+
+// Admin
+export const getAdminStats = () => api.get("/api/admin/stats");
+export const getAdminEmployees = (params) => api.get("/api/admin/employees", { params });
+export const updateEmployeeRole = (id, data) =>
+  api.patch(`/api/admin/employees/${id}/role`, data);
+
+// Article visibility + core
+export const setArticleVisibility = (id, visibility) =>
+  api.patch(`/api/knowledge/${id}/visibility`, { visibility });
+export const setArticleCore = (id, is_core) =>
+  api.patch(`/api/knowledge/${id}/core`, { is_core });
+
 export default api;
