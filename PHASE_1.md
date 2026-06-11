@@ -357,33 +357,68 @@ h4 {
 }
 
 @keyframes messageIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes articleReveal {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes captureIn {
-  from { opacity: 0; transform: translateX(5px); }
-  to   { opacity: 1; transform: translateX(0);   }
+  from {
+    opacity: 0;
+    transform: translateX(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes pageFade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes skeletonPulse {
-  0%, 100% { opacity: 1;    }
-  50%       { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 @keyframes typingDot {
-  0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
-  30%           { transform: translateY(-4px); opacity: 1;    }
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 ```
 
@@ -595,7 +630,9 @@ answerFromContext(prompt)                   → string
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+const embeddingModel = genAI.getGenerativeModel({
+  model: "text-embedding-004",
+});
 
 // Returns float array of 768 dimensions
 export const generateEmbedding = async (text) => {
@@ -1033,10 +1070,11 @@ Do not build this now.
 **Soft delete — important:**
 Rejecting an article sets `rejected=true`. The article is NEVER hard-deleted.
 Rejected articles have `approved=false`, so they are automatically excluded from:
+
 - `GET /api/knowledge` (filters `approved=true`)
 - `match_articles` RPC (filters `approved=true`)
 - `GET /api/manager/pending` (filters `approved=false AND rejected=false`)
-They are only visible to managers reading a specific article directly.
+  They are only visible to managers reading a specific article directly.
 
 ```
 ✓ Manager route guard:
