@@ -23,20 +23,26 @@ const auth = async (req, res, next) => {
       .json({ data: null, error: "Unauthorized", message: "Please log in to continue." });
   }
 
-  const { data: employee, error } = await supabase
-    .from("employees")
-    .select("id, name, email, is_manager, is_admin, group_id, job_title")
-    .eq("id", decoded.id)
-    .single();
+  try {
+    const { data: employee, error } = await supabase
+      .from("employees")
+      .select("id, name, email, is_manager, is_admin, group_id, job_title")
+      .eq("id", decoded.id)
+      .single();
 
-  if (error || !employee) {
+    if (error || !employee) {
+      return res
+        .status(401)
+        .json({ data: null, error: "Unauthorized", message: "Please log in to continue." });
+    }
+
+    req.employee = employee;
+    next();
+  } catch {
     return res
       .status(401)
       .json({ data: null, error: "Unauthorized", message: "Please log in to continue." });
   }
-
-  req.employee = employee;
-  next();
 };
 
 export default auth;

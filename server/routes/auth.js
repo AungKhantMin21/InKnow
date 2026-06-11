@@ -92,7 +92,7 @@ router.get("/me", auth, async (req, res, next) => {
   try {
     const { data: employee, error } = await supabase
       .from("employees")
-      .select("id, name, email, is_manager, is_admin, group_id, job_title, created_at, groups(name)")
+      .select("id, name, email, is_manager, is_admin, group_id, job_title, created_at")
       .eq("id", req.employee.id)
       .single();
 
