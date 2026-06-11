@@ -277,6 +277,130 @@ router.patch("/:id/approve", async (req, res, next) => {
   }
 });
 
+// PATCH /api/knowledge/:id/visibility — manager only
+router.patch("/:id/visibility", async (req, res, next) => {
+  try {
+    if (!req.employee.is_manager || !req.employee.group_id) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { visibility } = req.body;
+    if (!["private", "public"].includes(visibility)) {
+      return res.status(400).json({
+        data: null,
+        error: "Invalid visibility",
+        message: "We need this to continue.",
+      });
+    }
+
+    const updates = { visibility };
+    // Toggling back to private auto-removes core status per the state machine
+    if (visibility === "private") updates.is_core = false;
+
+    const { data: article, error } = await supabase
+      .from("knowledge_articles")
+      .update(updates)
+      .eq("id", req.params.id)
+      .eq("group_id", req.employee.group_id)
+      .select()
+      .single();
+
+    if (error || !article) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    res.json({ data: { article }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/knowledge/:id/core — admin only, hard cap 20
+router.patch("/:id/core", async (req, res, next) => {
+  try {
+    if (!req.employee.is_admin) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { is_core } = req.body;
+    if (typeof is_core !== "boolean") {
+      return res.status(400).json({
+        data: null,
+        error: "Missing fields",
+        message: "We need this to continue.",
+      });
+    }
+
+    if (is_core) {
+      const { data: target, error: fetchErr } = await supabase
+        .from("knowledge_articles")
+        .select("visibility")
+        .eq("id", req.params.id)
+        .single();
+
+      if (fetchErr || !target) {
+        return res.status(404).json({
+          data: null,
+          error: "Not found",
+          message: "We couldn't find that. Try going back.",
+        });
+      }
+
+      if (target.visibility !== "public") {
+        return res.status(400).json({
+          data: null,
+          error: "Not public",
+          message: "An article must be public before it can be marked as core.",
+        });
+      }
+
+      const { count } = await supabase
+        .from("knowledge_articles")
+        .select("id", { count: "exact", head: true })
+        .eq("is_core", true);
+
+      if ((count ?? 0) >= 20) {
+        return res.status(400).json({
+          data: null,
+          error: "Core limit reached",
+          message: "You've reached the 20 core article limit. Remove one before adding another.",
+        });
+      }
+    }
+
+    const { data: article, error } = await supabase
+      .from("knowledge_articles")
+      .update({ is_core })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error || !article) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    res.json({ data: { article }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PATCH /api/knowledge/:id/reject — manager only, soft delete
 router.patch("/:id/reject", async (req, res, next) => {
   try {
