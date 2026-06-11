@@ -10,6 +10,11 @@ import Knowledge from "./pages/Knowledge.jsx";
 import ArticleDetail from "./pages/ArticleDetail.jsx";
 import Copilot from "./pages/Copilot.jsx";
 import Manager from "./pages/Manager.jsx";
+import AdminGroups from "./pages/admin/AdminGroups.jsx";
+import AdminGroupDetail from "./pages/admin/AdminGroupDetail.jsx";
+import AdminEmployees from "./pages/admin/AdminEmployees.jsx";
+import AdminCoreKnowledge from "./pages/admin/AdminCoreKnowledge.jsx";
+import AdminStats from "./pages/admin/AdminStats.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -123,15 +128,13 @@ const AppRoutes = () => {
           </ManagerRoute>
         }
       />
-      {/* Admin portal — pages added in Step 04 */}
-      <Route
-        path="/admin/*"
-        element={
-          <AdminRoute>
-            <Navigate to="/dashboard" replace />
-          </AdminRoute>
-        }
-      />
+      {/* Admin portal */}
+      <Route path="/admin" element={<AdminRoute><Navigate to="/admin/groups" replace /></AdminRoute>} />
+      <Route path="/admin/groups" element={<AdminRoute><AdminGroups /></AdminRoute>} />
+      <Route path="/admin/groups/:id" element={<AdminRoute><AdminGroupDetail /></AdminRoute>} />
+      <Route path="/admin/employees" element={<AdminRoute><AdminEmployees /></AdminRoute>} />
+      <Route path="/admin/core-knowledge" element={<AdminRoute><AdminCoreKnowledge /></AdminRoute>} />
+      <Route path="/admin/stats" element={<AdminRoute><AdminStats /></AdminRoute>} />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
     </Routes>
   );
