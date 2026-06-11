@@ -45,10 +45,10 @@ const SessionCard = ({ session, onNavigate }) => {
             className="font-display text-ink leading-tight mb-1 truncate"
             style={{ fontWeight: 200, fontSize: 15 }}
           >
-            {session.title || session.roles?.name || "Capture session"}
+            {session.title || session.groups?.name || "Capture session"}
           </p>
           <p className="font-mono text-[9px] text-ink-4 tracking-[0.04em]">
-            {session.roles?.name}
+            {session.groups?.name}
             {" · "}
             {formatDate(date)}
             {" · "}

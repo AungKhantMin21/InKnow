@@ -57,8 +57,6 @@ const SessionComplete = () => {
     new_articles: initialNewArticles = [],
     updated_articles: initialUpdatedArticles = [],
     title,
-    roleId,
-    roleName,
     generationFailed,
     generationEmpty,
   } = location.state || {};
@@ -91,8 +89,6 @@ const SessionComplete = () => {
         articles,
         new_articles: newArticles,
         updated_articles: updatedArticles,
-        roleId,
-        roleName,
         sessionId,
       },
     });

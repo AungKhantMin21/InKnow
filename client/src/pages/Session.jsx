@@ -145,7 +145,7 @@ const SessionGuard = ({ existing, onResume, onCreateNew, loading }) => (
           You have an unfinished session on this role:
         </p>
         <p className="font-display text-ink mb-4" style={{ fontWeight: 200, fontSize: 15 }}>
-          {existing.title || existing.roles?.name || "Capture session"}
+          {existing.title || existing.groups?.name || "Capture session"}
         </p>
         <div className="flex gap-3">
           <button
@@ -219,11 +219,8 @@ const Session = () => {
       // Check for existing active/re-opened sessions before creating
       listSessions()
         .then(({ data }) => {
-          const roleId = user?.role_id;
           const existing = data.data.sessions.find(
-            (s) =>
-              (s.status === "active" || s.status === "re-opened") &&
-              s.role_id === roleId,
+            (s) => s.status === "active" || s.status === "re-opened",
           );
           if (existing) {
             setGuardSession(existing);
@@ -350,8 +347,7 @@ const Session = () => {
           title: result.title,
           generationFailed: result.generationFailed || false,
           generationEmpty: result.type === "generation_empty",
-          roleId: session?.role_id,
-          roleName: user?.roles?.name,
+          jobTitle: user?.job_title,
           sessionId: id,
         },
       });
@@ -363,7 +359,7 @@ const Session = () => {
 
   const employeeMessageCount = messages.filter((m) => m.role === "employee").length;
   const shortId = id ? id.slice(-8).toUpperCase() : "";
-  const roleName = user?.roles?.name || "";
+  const jobTitle = user?.job_title || "";
   const status = session?.status || "active";
 
   // ── Guard screen ─────────────────────────────────────────────────────────
@@ -449,13 +445,13 @@ const Session = () => {
           className="font-display text-ink truncate"
           style={{ fontWeight: 200, fontSize: 13, maxWidth: 240 }}
         >
-          {session?.title || roleName || "Session"}
+          {session?.title || jobTitle || "Session"}
         </span>
-        {roleName && session?.title && (
+        {jobTitle && session?.title && (
           <>
             <div className="w-px h-4 bg-rule" />
             <span className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-3">
-              {roleName}
+              {jobTitle}
             </span>
           </>
         )}

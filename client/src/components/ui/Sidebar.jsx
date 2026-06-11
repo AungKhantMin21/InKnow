@@ -113,7 +113,7 @@ const Sidebar = () => {
       <div className="px-6 py-4 border-t border-rule">
         <p className="font-body font-light text-xs text-ink-2 truncate">{user?.name}</p>
         <p className="font-mono text-[9px] tracking-wider text-ink-4 truncate mt-0.5">
-          {user?.roles?.name || ""}
+          {user?.job_title || ""}
         </p>
         <button
           onClick={handleLogout}

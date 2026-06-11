@@ -306,7 +306,7 @@ const ArticleDetail = () => {
           </button>
           <div className="w-px h-4 bg-rule" />
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">
-            {article.roles?.name || ""}
+            {article.groups?.name || ""}
           </span>
           {!article.approved && !article.rejected && (
             <>
@@ -338,7 +338,7 @@ const ArticleDetail = () => {
             {/* Meta */}
             <div className="flex items-center gap-3 mb-6">
               <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
-                {article.roles?.name || "Unknown role"}
+                {article.groups?.name || ""}
               </span>
               <span className="font-mono text-[9px] tracking-wider text-ink-4">
                 {article.capturer?.name || "Unknown"} · {date}

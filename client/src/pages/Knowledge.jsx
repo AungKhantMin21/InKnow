@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/ui/Sidebar.jsx";
-import { getArticles, getRoles } from "../lib/api.js";
+import { getArticles } from "../lib/api.js";
 
 const getFreshness = (createdAt) => {
   const days = (Date.now() - new Date(createdAt)) / 86400000;
@@ -41,7 +41,7 @@ const ArticleCard = ({ article, onClick }) => {
     >
       <div className="flex items-center justify-between mb-3">
         <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
-          {article.roles?.name || "Unknown role"}
+          {article.groups?.name || ""}
         </span>
         {freshness && (
           <span
@@ -89,66 +89,39 @@ const ArticleCard = ({ article, onClick }) => {
 const Knowledge = () => {
   const navigate = useNavigate();
   const [articles, setArticles] = useState([]);
-  const [roles, setRoles] = useState([]);
-  const [selectedRole, setSelectedRole] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getRoles()
-      .then(({ data }) => setRoles(data.data.roles))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
     setLoading(true);
     setError(null);
     const params = {};
-    if (selectedRole) params.role_id = selectedRole;
     if (search.trim()) params.search = search.trim();
 
     getArticles(params)
       .then(({ data }) => setArticles(data.data.articles))
       .catch(() => setError("Something went wrong — try again."))
       .finally(() => setLoading(false));
-  }, [selectedRole, search]);
+  }, [search]);
 
   return (
     <div className="min-h-screen bg-surface flex" style={{ animation: "pageFade 200ms ease" }}>
       <Sidebar />
 
-      {/* Role filter panel */}
+      {/* Group filter panel — populated in Step 04 */}
       <aside className="w-48 bg-white border-r border-rule flex-shrink-0 flex flex-col">
         <div className="px-5 pt-6 pb-3 border-b border-rule">
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">
-            Filter by role
+            Filter by group
           </span>
         </div>
         <nav className="flex-1 px-3 py-3 flex flex-col gap-0.5 overflow-y-auto">
           <button
-            onClick={() => setSelectedRole(null)}
-            className={`w-full text-left px-3 py-2 font-body font-light text-sm transition-colors ${
-              selectedRole === null
-                ? "bg-ground text-ink"
-                : "text-ink-2 hover:bg-ground hover:text-ink"
-            }`}
+            className="w-full text-left px-3 py-2 font-body font-light text-sm bg-ground text-ink transition-colors"
           >
-            All roles
+            All groups
           </button>
-          {roles.map((role) => (
-            <button
-              key={role.id}
-              onClick={() => setSelectedRole(role.id)}
-              className={`w-full text-left px-3 py-2 font-body font-light text-sm transition-colors ${
-                selectedRole === role.id
-                  ? "bg-ground text-ink"
-                  : "text-ink-2 hover:bg-ground hover:text-ink"
-              }`}
-            >
-              {role.name}
-            </button>
-          ))}
         </nav>
       </aside>
 
@@ -185,7 +158,6 @@ const Knowledge = () => {
                 setError(null);
                 setLoading(true);
                 const params = {};
-                if (selectedRole) params.role_id = selectedRole;
                 if (search.trim()) params.search = search.trim();
                 getArticles(params)
                   .then(({ data }) => setArticles(data.data.articles))

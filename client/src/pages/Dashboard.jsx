@@ -153,7 +153,7 @@ const Dashboard = () => {
 
                     {/* Role name */}
                     <span className="font-body font-light text-sm text-ink flex-1 truncate">
-                      {session.roles?.name || "Capture session"}
+                      {session.title || session.groups?.name || "Capture session"}
                     </span>
 
                     {/* Exchanges */}

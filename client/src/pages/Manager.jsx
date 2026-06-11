@@ -128,7 +128,6 @@ const PendingRow = ({ article, onView, onApprove, onReject, approving, rejecting
       </button>
       <p className="font-mono text-[9px] tracking-wider text-ink-4 mt-1">
         {article.capturer?.name ?? "Unknown"}
-        {article.roles?.name ? ` · ${article.roles.name}` : ""}
         {" · "}{formatDate(article.created_at)}
       </p>
     </div>

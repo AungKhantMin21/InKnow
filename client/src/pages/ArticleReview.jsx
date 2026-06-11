@@ -81,8 +81,6 @@ const ArticleReview = () => {
     articles: initialArticles = [],
     new_articles: initialNew = [],
     updated_articles: initialUpdated = [],
-    roleId,
-    roleName,
     sessionId,
   } = location.state || {};
 
@@ -172,7 +170,6 @@ const ArticleReview = () => {
     setError(null);
     try {
       await saveArticle({
-        role_id: roleId,
         session_id: sessionId,
         title: current.title,
         summary: current.summary,
@@ -267,13 +264,8 @@ const ArticleReview = () => {
           {/* ── Update diff layout ───────────────────────────────────────────── */}
           {isUpdate ? (
             <>
-              {/* Role badge + version badge */}
-              <div className="flex items-center justify-between mb-6">
-                {roleName ? (
-                  <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
-                    {roleName}
-                  </span>
-                ) : <div />}
+              {/* Version badge */}
+              <div className="flex items-center justify-end mb-6">
                 <span
                   className="font-mono text-[8px] tracking-wider uppercase px-2 py-1"
                   style={{ color: "var(--amber)", background: "var(--amber-light)" }}
@@ -331,12 +323,7 @@ const ArticleReview = () => {
             /* ── New article layout ─────────────────────────────────────────── */
             <>
               {/* Meta row */}
-              <div className="flex items-center justify-between mb-5">
-                {roleName ? (
-                  <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
-                    {roleName}
-                  </span>
-                ) : <div />}
+              <div className="flex items-center justify-end mb-5">
                 {mode === "preview" && (
                   <button onClick={enterEditMode} className="flex items-center gap-1.5 font-body font-light text-xs text-ink-3 hover:text-ink transition-colors">
                     <PencilIcon />
