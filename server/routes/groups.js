@@ -47,6 +47,29 @@ router.get("/", requireAdmin, async (req, res, next) => {
   }
 });
 
+/** GET /api/groups/:id — admin only: single group info */
+router.get("/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { data: group, error } = await supabase
+      .from("groups")
+      .select("id, name, description, archived, created_at")
+      .eq("id", req.params.id)
+      .single();
+
+    if (error || !group) {
+      return res.status(404).json({
+        data: null,
+        error: "Not found",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    res.json({ data: { group }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /api/groups — admin only: create group */
 router.post("/", requireAdmin, async (req, res, next) => {
   try {
@@ -204,6 +227,40 @@ router.delete("/:id/members/:eid", requireAdmin, async (req, res, next) => {
     if (error) throw error;
 
     res.json({ data: null, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/groups/:id/invites — admin or that group's manager: list active invites */
+router.get("/:id/invites", async (req, res, next) => {
+  try {
+    const isAdmin = req.employee.is_admin;
+    const isGroupManager =
+      req.employee.is_manager && req.employee.group_id === req.params.id;
+
+    if (!isAdmin && !isGroupManager) {
+      return res.status(403).json({
+        data: null,
+        error: "Forbidden",
+        message: "We couldn't find that. Try going back.",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("group_invites")
+      .select("id, group_id, token, expires_at, created_at, created_by")
+      .eq("group_id", req.params.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const now = new Date();
+    const active = (data || []).filter(
+      (inv) => !inv.expires_at || new Date(inv.expires_at) > now,
+    );
+
+    res.json({ data: { invites: active }, error: null, message: null });
   } catch (err) {
     next(err);
   }

@@ -47,6 +47,8 @@ export const submitFeedback = (query_id, feedback) => api.post("/api/copilot/fee
 
 // Groups (admin)
 export const getGroups = () => api.get("/api/groups");
+export const getGroup = (id) => api.get(`/api/groups/${id}`);
+export const getGroupInvites = (id) => api.get(`/api/groups/${id}/invites`);
 export const createGroup = (data) => api.post("/api/groups", data);
 export const updateGroup = (id, data) => api.patch(`/api/groups/${id}`, data);
 export const archiveGroup = (id) => api.patch(`/api/groups/${id}/archive`);
