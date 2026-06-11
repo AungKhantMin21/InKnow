@@ -7,7 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/ui/Sidebar.jsx";
-import { getArticle, updateArticle, approveArticle, rejectArticle } from "../lib/api.js";
+import { getArticle, updateArticle, approveArticle, rejectArticle, setArticleVisibility } from "../lib/api.js";
 import { markdownToHtml, htmlToMarkdown } from "../lib/markdown.js";
 
 const markdownComponents = {
@@ -192,6 +192,8 @@ const ArticleDetail = () => {
   }, [id]);
 
   const isAuthor = article && user && article.captured_by === user.id;
+  const isGroupManager =
+    user?.is_manager && article && user.group_id === article.group_id;
 
   const enterEditMode = () => {
     setEditTitle(article.title);
@@ -229,6 +231,23 @@ const ArticleDetail = () => {
     } catch {
       setReviewError("Something went wrong — try again.");
       setApproving(false);
+    }
+  };
+
+  const handleToggleVisibility = async () => {
+    const newVisibility = article.visibility === "public" ? "private" : "public";
+    const prev = article;
+    // Optimistic update
+    setArticle({
+      ...article,
+      visibility: newVisibility,
+      is_core: newVisibility === "private" ? false : article.is_core,
+    });
+    try {
+      const { data } = await setArticleVisibility(id, newVisibility);
+      setArticle(data.data.article);
+    } catch {
+      setArticle(prev); // rollback on error
     }
   };
 
@@ -336,10 +355,26 @@ const ArticleDetail = () => {
           <div style={{ maxWidth: 720, width: "100%" }}>
 
             {/* Meta */}
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-6 flex-wrap">
               <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
                 {article.groups?.name || ""}
               </span>
+              {article.is_core && (
+                <span
+                  className="font-mono text-[7px] tracking-[0.14em] uppercase px-1.5 py-0.5"
+                  style={{ color: "var(--volt)", background: "var(--volt-light)", border: "1px solid rgba(45,78,255,0.2)" }}
+                >
+                  Core
+                </span>
+              )}
+              {article.visibility === "public" && !article.is_core && (
+                <span
+                  className="font-mono text-[7px] tracking-[0.14em] uppercase px-1.5 py-0.5"
+                  style={{ color: "var(--forest)", background: "var(--forest-light)", border: "1px solid rgba(26,107,69,0.2)" }}
+                >
+                  Public
+                </span>
+              )}
               <span className="font-mono text-[9px] tracking-wider text-ink-4">
                 {article.capturer?.name || "Unknown"} · {date}
               </span>
@@ -349,6 +384,31 @@ const ArticleDetail = () => {
                 </span>
               )}
             </div>
+
+            {/* Visibility toggle — manager only */}
+            {isGroupManager && article.approved && mode === "view" && (
+              <div className="flex items-center gap-3 mb-6 pb-6 border-b border-rule">
+                <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-ink-4">
+                  Visibility
+                </span>
+                <button
+                  onClick={handleToggleVisibility}
+                  className={`font-mono text-[8px] tracking-[0.14em] uppercase px-3 py-1.5 border transition-colors ${
+                    article.visibility === "public"
+                      ? "bg-forest-light text-forest"
+                      : "bg-ground text-ink-3 border-rule"
+                  }`}
+                  style={article.visibility === "public" ? { borderColor: "rgba(26,107,69,0.2)" } : {}}
+                >
+                  {article.visibility === "public" ? "Public" : "Private"}
+                </button>
+                <span className="font-body font-light text-xs text-ink-3">
+                  {article.visibility === "public"
+                    ? "Visible to everyone in the company"
+                    : "Visible to your group only"}
+                </span>
+              </div>
+            )}
 
             {/* Title */}
             {mode === "view" ? (

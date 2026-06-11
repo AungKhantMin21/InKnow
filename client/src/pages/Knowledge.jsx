@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth.jsx";
 import Sidebar from "../components/ui/Sidebar.jsx";
-import { getArticles } from "../lib/api.js";
+import { getArticles, getGroups } from "../lib/api.js";
 
 const getFreshness = (createdAt) => {
   const days = (Date.now() - new Date(createdAt)) / 86400000;
@@ -43,17 +44,36 @@ const ArticleCard = ({ article, onClick }) => {
         <span className="font-mono text-[8px] tracking-[0.16em] uppercase text-ink-3 bg-ground border border-rule px-2 py-1">
           {article.groups?.name || ""}
         </span>
-        {freshness && (
-          <span
-            className="font-mono text-[8px] tracking-[0.12em] uppercase px-2 py-1 rounded-sm"
-            style={{
-              color: freshness === "fresh" ? "var(--forest)" : "var(--amber)",
-              background: freshness === "fresh" ? "var(--forest-light)" : "var(--amber-light)",
-            }}
-          >
-            {freshness === "fresh" ? "New" : "Recent"}
-          </span>
-        )}
+
+        <div className="flex items-center gap-1.5">
+          {article.is_core && (
+            <span
+              className="font-mono text-[7px] tracking-[0.14em] uppercase px-1.5 py-0.5"
+              style={{ color: "var(--volt)", background: "var(--volt-light)", border: "1px solid rgba(45,78,255,0.2)" }}
+            >
+              Core
+            </span>
+          )}
+          {article.visibility === "public" && !article.is_core && (
+            <span
+              className="font-mono text-[7px] tracking-[0.14em] uppercase px-1.5 py-0.5"
+              style={{ color: "var(--forest)", background: "var(--forest-light)", border: "1px solid rgba(26,107,69,0.2)" }}
+            >
+              Public
+            </span>
+          )}
+          {freshness && !article.is_core && (
+            <span
+              className="font-mono text-[8px] tracking-[0.12em] uppercase px-2 py-1 rounded-sm"
+              style={{
+                color: freshness === "fresh" ? "var(--forest)" : "var(--amber)",
+                background: freshness === "fresh" ? "var(--forest-light)" : "var(--amber-light)",
+              }}
+            >
+              {freshness === "fresh" ? "New" : "Recent"}
+            </span>
+          )}
+        </div>
       </div>
 
       <h2
@@ -88,28 +108,75 @@ const ArticleCard = ({ article, onClick }) => {
 
 const Knowledge = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [articles, setArticles] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filterGroupId, setFilterGroupId] = useState(null);
+  const [filterGroups, setFilterGroups] = useState([]);
+  const groupsLoaded = useRef(false);
 
+  // Load groups for filter sidebar once
+  useEffect(() => {
+    if (!user) return;
+    if (user.is_admin) {
+      getGroups()
+        .then(({ data }) => {
+          setFilterGroups(data.data.groups || []);
+          groupsLoaded.current = true;
+        })
+        .catch(() => {});
+    }
+  }, [user?.is_admin]);
+
+  // Load articles whenever search or group filter changes
   useEffect(() => {
     setLoading(true);
     setError(null);
     const params = {};
     if (search.trim()) params.search = search.trim();
+    if (filterGroupId) params.group_id = filterGroupId;
 
     getArticles(params)
-      .then(({ data }) => setArticles(data.data.articles))
+      .then(({ data }) => {
+        const arts = data.data.articles || [];
+        setArticles(arts);
+        // Derive groups for non-admin from first unfiltered load
+        if (!groupsLoaded.current && !filterGroupId) {
+          groupsLoaded.current = true;
+          const seen = new Set();
+          const groups = [];
+          for (const a of arts) {
+            if (a.group_id && a.groups?.name && !seen.has(a.group_id)) {
+              seen.add(a.group_id);
+              groups.push({ id: a.group_id, name: a.groups.name });
+            }
+          }
+          setFilterGroups(groups.sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      })
       .catch(() => setError("Something went wrong — try again."))
       .finally(() => setLoading(false));
-  }, [search]);
+  }, [search, filterGroupId]);
+
+  const retryLoad = () => {
+    setError(null);
+    setLoading(true);
+    const params = {};
+    if (search.trim()) params.search = search.trim();
+    if (filterGroupId) params.group_id = filterGroupId;
+    getArticles(params)
+      .then(({ data }) => setArticles(data.data.articles || []))
+      .catch(() => setError("Something went wrong — try again."))
+      .finally(() => setLoading(false));
+  };
 
   return (
     <div className="min-h-screen bg-surface flex" style={{ animation: "pageFade 200ms ease" }}>
       <Sidebar />
 
-      {/* Group filter panel — populated in Step 04 */}
+      {/* Group filter panel */}
       <aside className="w-48 bg-white border-r border-rule flex-shrink-0 flex flex-col">
         <div className="px-5 pt-6 pb-3 border-b border-rule">
           <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-ink-4">
@@ -118,10 +185,26 @@ const Knowledge = () => {
         </div>
         <nav className="flex-1 px-3 py-3 flex flex-col gap-0.5 overflow-y-auto">
           <button
-            className="w-full text-left px-3 py-2 font-body font-light text-sm bg-ground text-ink transition-colors"
+            onClick={() => setFilterGroupId(null)}
+            className={`w-full text-left px-3 py-2 font-body font-light text-sm transition-colors ${
+              !filterGroupId ? "bg-ground text-ink" : "text-ink-2 hover:bg-ground hover:text-ink"
+            }`}
           >
             All groups
           </button>
+          {filterGroups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setFilterGroupId(g.id === filterGroupId ? null : g.id)}
+              className={`w-full text-left px-3 py-2 font-body font-light text-sm transition-colors ${
+                filterGroupId === g.id
+                  ? "bg-ground text-ink"
+                  : "text-ink-2 hover:bg-ground hover:text-ink"
+              }`}
+            >
+              {g.name}
+            </button>
+          ))}
         </nav>
       </aside>
 
@@ -154,16 +237,7 @@ const Knowledge = () => {
               {error}
             </p>
             <button
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                const params = {};
-                if (search.trim()) params.search = search.trim();
-                getArticles(params)
-                  .then(({ data }) => setArticles(data.data.articles))
-                  .catch(() => setError("Something went wrong — try again."))
-                  .finally(() => setLoading(false));
-              }}
+              onClick={retryLoad}
               className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
             >
               Try again →
@@ -194,14 +268,18 @@ const Knowledge = () => {
         {!loading && !error && articles.length === 0 && (
           <div className="bg-white border border-rule px-8 py-12 text-center">
             <p className="font-body font-light text-sm text-ink-3 mb-4">
-              No knowledge captured for this role yet.
+              {filterGroupId
+                ? "No articles in this group yet."
+                : "No knowledge captured for this role yet."}
             </p>
-            <button
-              onClick={() => navigate("/sessions/new")}
-              className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
-            >
-              Start the first capture session →
-            </button>
+            {!filterGroupId && (
+              <button
+                onClick={() => navigate("/sessions/new")}
+                className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+              >
+                Start the first capture session →
+              </button>
+            )}
           </div>
         )}
       </main>
