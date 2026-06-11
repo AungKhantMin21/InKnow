@@ -30,8 +30,8 @@ export const AuthProvider = ({ children }) => {
     return data.data.employee;
   };
 
-  const register = async (name, email, password, role_id) => {
-    const { data } = await apiRegister({ name, email, password, role_id });
+  const register = async (name, email, password) => {
+    const { data } = await apiRegister({ name, email, password });
     saveAuth(data.data.token, data.data.employee);
     setUser(data.data.employee);
     return data.data.employee;

@@ -1,23 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.jsx";
-import { getRoles } from "../lib/api.js";
 
 const Login = () => {
   const [mode, setMode] = useState("login");
-  const [roles, setRoles] = useState([]);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role_id: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (mode === "register") {
-      getRoles().then(({ data }) => setRoles(data.data.roles));
-    }
-  }, [mode]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -29,7 +21,7 @@ const Login = () => {
       if (mode === "login") {
         await login(form.email, form.password);
       } else {
-        await register(form.name, form.email, form.password, form.role_id);
+        await register(form.name, form.email, form.password);
       }
       navigate("/dashboard");
     } catch (err) {
@@ -92,22 +84,6 @@ const Login = () => {
             required
             className={inputClass}
           />
-
-          {mode === "register" && (
-            <select
-              value={form.role_id}
-              onChange={set("role_id")}
-              required
-              className={inputClass}
-            >
-              <option value="">Select your role</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          )}
 
           {error && (
             <p className="font-body text-xs" style={{ color: "var(--danger)" }}>

@@ -16,9 +16,6 @@ export const register = (data) => api.post("/api/auth/register", data);
 export const login = (data) => api.post("/api/auth/login", data);
 export const getMe = () => api.get("/api/auth/me");
 
-// Roles
-export const getRoles = () => api.get("/api/roles");
-
 // Sessions
 export const listSessions = () => api.get("/api/sessions");
 export const createSession = () => api.post("/api/sessions");
