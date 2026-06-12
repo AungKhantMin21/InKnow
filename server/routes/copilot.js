@@ -121,7 +121,14 @@ router.post("/query", async (req, res, next) => {
     // it means the retrieved articles weren't relevant enough to answer.
     // Normalise those cases to a true gap state so the client renders
     // the gap UI rather than a low-confidence "answer" with sources.
-    const GAP_PHRASES = ["nobody has captured", "nobody's captured", "nobody captured"];
+    const GAP_PHRASES = [
+      "nobody in your group has captured",
+      "nobody has captured",
+      "nobody's captured",
+      "nobody captured",
+      "may exist in another team's private",
+      "don't have access to it",
+    ];
     const isGap = !answer || GAP_PHRASES.some((p) => answer.toLowerCase().includes(p));
     if (isGap) {
       answer = null;
