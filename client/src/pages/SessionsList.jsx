@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth.jsx";
 import { listSessions } from "../lib/api.js";
 import Sidebar from "../components/ui/Sidebar.jsx";
 
@@ -29,10 +30,11 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const SessionCard = ({ session, onNavigate }) => {
+const SessionCard = ({ session, jobTitle, onNavigate }) => {
   const exchanges = Math.floor((session.message_count || 0) / 2);
   const isInProgress = session.status === "active" || session.status === "re-opened";
   const date = isInProgress ? session.started_at : (session.last_completed_at || session.completed_at);
+  const displayTitle = session.title || jobTitle || "Session";
 
   return (
     <div
@@ -45,7 +47,7 @@ const SessionCard = ({ session, onNavigate }) => {
             className="font-display text-ink leading-tight mb-1 truncate"
             style={{ fontWeight: 200, fontSize: 15 }}
           >
-            {session.title || session.groups?.name || "Capture session"}
+            {displayTitle}
           </p>
           <p className="font-mono text-[9px] text-ink-4 tracking-[0.04em]">
             {session.groups?.name}
@@ -89,6 +91,8 @@ const SessionsList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const jobTitle = user?.job_title || "";
 
   useEffect(() => {
     listSessions()
@@ -176,7 +180,7 @@ const SessionsList = () => {
                 <SectionLabel label="In progress" />
                 <div className="flex flex-col gap-2">
                   {inProgress.map((s) => (
-                    <SessionCard key={s.id} session={s} onNavigate={navigate} />
+                    <SessionCard key={s.id} session={s} jobTitle={jobTitle} onNavigate={navigate} />
                   ))}
                 </div>
               </div>
@@ -187,7 +191,7 @@ const SessionsList = () => {
                 <SectionLabel label="Completed" />
                 <div className="flex flex-col gap-2">
                   {completed.map((s) => (
-                    <SessionCard key={s.id} session={s} onNavigate={navigate} />
+                    <SessionCard key={s.id} session={s} jobTitle={jobTitle} onNavigate={navigate} />
                   ))}
                 </div>
               </div>
