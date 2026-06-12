@@ -215,10 +215,13 @@ const Session = () => {
 
   // Create or load session
   useEffect(() => {
+    let cancelled = false;
+
     if (!id || id === "new") {
       // Check for existing active/re-opened sessions before creating
       listSessions()
         .then(({ data }) => {
+          if (cancelled) return;
           const existing = data.data.sessions.find(
             (s) => s.status === "active" || s.status === "re-opened",
           );
@@ -227,17 +230,20 @@ const Session = () => {
             setInitializing(false);
           } else {
             return createSession().then(({ data: d }) => {
+              if (cancelled) return;
               navigate(`/sessions/${d.data.session.id}`, { replace: true });
             });
           }
         })
         .catch(() => {
+          if (cancelled) return;
           setError("Something went wrong — try again.");
           setInitializing(false);
         });
     } else {
       getSession(id)
         .then(({ data }) => {
+          if (cancelled) return;
           setSession(data.data.session);
           setMessages(data.data.messages);
           if (
@@ -247,9 +253,19 @@ const Session = () => {
             loadSessionArticles(id);
           }
         })
-        .catch(() => setError("Something went wrong — try again."))
-        .finally(() => setInitializing(false));
+        .catch(() => {
+          if (cancelled) return;
+          setError("Something went wrong — try again.");
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setInitializing(false);
+        });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const handleCreateNew = () => {
