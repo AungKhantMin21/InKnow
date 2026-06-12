@@ -254,6 +254,8 @@ const Session = () => {
 
   const handleCreateNew = () => {
     setGuardLoading(true);
+    setGuardSession(null);
+    setInitializing(true);
     createSession()
       .then(({ data }) => {
         navigate(`/sessions/${data.data.session.id}`, { replace: true });
@@ -261,6 +263,7 @@ const Session = () => {
       .catch(() => {
         setError("Something went wrong — try again.");
         setGuardLoading(false);
+        setInitializing(false);
       });
   };
 
