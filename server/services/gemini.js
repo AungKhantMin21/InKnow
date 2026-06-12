@@ -1,8 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAICacheManager } from "@google/generative-ai/server";
 import supabase from "../db/supabase.js";
 import { generateEmbedding } from "./embeddings.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const cacheManager = new GoogleAICacheManager(process.env.GEMINI_API_KEY);
 
 /** Build 4-tier knowledge context for a session system prompt */
 export const buildSessionContext = async (employeeGroupId, jobTitle, groupName) => {
@@ -442,7 +444,7 @@ export const answerFromContext = async (prompt) => {
 export const isCacheValid = async (cacheId) => {
   if (!cacheId) return false;
   try {
-    await genAI.caches.get(cacheId);
+    await cacheManager.get(cacheId);
     return true;
   } catch {
     return false;
@@ -451,12 +453,10 @@ export const isCacheValid = async (cacheId) => {
 
 /** Create an explicit Gemini cache for a session system prompt — returns cache.name */
 export const createSessionCache = async (systemPrompt) => {
-  const cache = await genAI.caches.create({
-    model: "gemini-2.0-flash",
-    config: {
-      systemInstruction: systemPrompt,
-      ttl: "7200s",
-    },
+  const cache = await cacheManager.create({
+    model: "models/gemini-2.0-flash",
+    systemInstruction: systemPrompt,
+    ttlSeconds: 7200,
   });
   return cache.name;
 };
@@ -466,10 +466,8 @@ export const createSessionCache = async (systemPrompt) => {
  * history = array of { role: 'ai'|'employee', content: string }
  */
 export const sendCachedMessage = async (cacheId, history, newMessage) => {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    cachedContent: cacheId,
-  });
+  const cache = await cacheManager.get(cacheId);
+  const model = genAI.getGenerativeModelFromCachedContent(cache);
 
   let formattedHistory = history.map((msg) => ({
     role: msg.role === "ai" ? "model" : "user",
