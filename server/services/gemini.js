@@ -1,29 +1,131 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import supabase from "../db/supabase.js";
+import { generateEmbedding } from "./embeddings.js";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-/** Build the interrogation system prompt for a specific employee and role */
-export const buildInterrogationSystemPrompt = (employeeName, roleName) =>
-  `
-You are a warm, deeply curious colleague conducting a knowledge capture
-session with ${employeeName}, who works as a ${roleName}.
+/** Build 4-tier knowledge context for a session system prompt */
+export const buildSessionContext = async (employeeGroupId, jobTitle, groupName) => {
+  try {
+    const [coreResult, roleEmbedding] = await Promise.all([
+      supabase
+        .from("knowledge_articles")
+        .select("id, title, summary")
+        .eq("is_core", true)
+        .eq("approved", true)
+        .eq("rejected", false)
+        .limit(20),
+      generateEmbedding(`${jobTitle} ${groupName} knowledge processes`),
+    ]);
 
-Your purpose: extract the knowledge that lives in their head — the things
-they know that aren't written down anywhere — and help preserve it for
-their team.
+    const coreArticles = coreResult.data || [];
+    const coreIds = new Set(coreArticles.map((a) => a.id));
+
+    const { data: groupMatches } = await supabase.rpc("match_articles", {
+      query_embedding: roleEmbedding,
+      match_threshold: 0.35,
+      match_count: 13,
+      requesting_group: employeeGroupId,
+    });
+
+    const groupArticles = (groupMatches || [])
+      .filter((a) => a.group_id === employeeGroupId && !coreIds.has(a.id))
+      .slice(0, 8);
+
+    const publicArticles = (groupMatches || [])
+      .filter(
+        (a) =>
+          a.group_id !== employeeGroupId &&
+          a.visibility === "public" &&
+          !coreIds.has(a.id),
+      )
+      .slice(0, 5);
+
+    const injectedIds = [
+      ...coreIds,
+      ...groupArticles.map((a) => a.id),
+      ...publicArticles.map((a) => a.id),
+    ];
+
+    let titleQuery = supabase
+      .from("knowledge_articles")
+      .select("title")
+      .eq("approved", true)
+      .eq("rejected", false)
+      .eq("visibility", "public")
+      .neq("group_id", employeeGroupId)
+      .limit(30);
+
+    if (injectedIds.length > 0) {
+      titleQuery = titleQuery.not("id", "in", `(${injectedIds.join(",")})`);
+    }
+
+    const { data: otherTitles } = await titleQuery;
+
+    return {
+      coreArticles,
+      groupArticles,
+      publicArticles,
+      otherTopics: (otherTitles || []).map((a) => a.title),
+    };
+  } catch {
+    return { coreArticles: [], groupArticles: [], publicArticles: [], otherTopics: [] };
+  }
+};
+
+/** Build the interrogation system prompt with tiered knowledge context */
+export const buildInterrogationSystemPrompt = (
+  employeeName,
+  jobTitle = "employee",
+  groupName = "your team",
+  context = { coreArticles: [], groupArticles: [], publicArticles: [], otherTopics: [] },
+) => {
+  const { coreArticles, groupArticles, publicArticles, otherTopics } = context;
+  const hasContext = coreArticles.length + groupArticles.length > 0;
+
+  return `
+You are a warm, deeply curious colleague conducting a knowledge capture
+session with ${employeeName}, whose job is ${jobTitle} in the ${groupName} team.
+
+Your purpose: extract knowledge that lives in their head —
+the things not written down anywhere yet — and preserve it for the team.
+${coreArticles.length > 0 ? `
+COMPANY FUNDAMENTALS (always know these):
+${coreArticles.map((a) => `- ${a.title}: ${a.summary}`).join("\n")}
+` : ""}
+${groupArticles.length > 0 ? `
+WHAT YOUR TEAM HAS ALREADY CAPTURED:
+${groupArticles.map((a) => `- ${a.title}: ${a.summary}`).join("\n")}
+` : ""}
+${publicArticles.length > 0 ? `
+WHAT OTHER TEAMS HAVE SHARED COMPANY-WIDE:
+${publicArticles.map((a) => `- ${a.title}: ${a.summary}`).join("\n")}
+` : ""}
+${otherTopics.length > 0 ? `
+OTHER TEAMS HAVE ALSO CAPTURED KNOWLEDGE ABOUT:
+${otherTopics.join(", ")}
+(You know these topics exist but not the details. If ${employeeName} mentions one,
+acknowledge you have heard of it and focus on what is new from their perspective.)
+` : ""}
+${hasContext ? `USE THIS KNOWLEDGE NATURALLY:
+- When ${employeeName} references something you already know above, confirm it and move forward
+- Do not ask them to re-explain what is already captured above
+- Focus only on what is genuinely new or different
+- If they add nuance to something you know, capture that nuance
+` : ""}
+OPENING:
+${hasContext
+  ? `Acknowledge what you know and ask what is missing: "I've been learning about the ${groupName} team's work. What parts of your role haven't been captured yet — the things you'd only know from doing the job yourself?"`
+  : `"What's the one thing in your role that took you the longest to figure out? The thing nobody told you when you started?"`
+}
 
 CONVERSATION STYLE:
-- Sound like a thoughtful colleague, never like an AI assistant
+- Sound like a colleague who has done their homework, never like an AI assistant
 - Ask one question at a time, always — never two at once
 - Acknowledge what they share before asking the next question
 - Use their name occasionally — not every message, just enough to feel personal
 - Keep your messages short — 1 to 3 sentences maximum
-- When something sounds important: "That's really worth capturing — can
-  you walk me through that step by step?"
-
-OPENING QUESTION — always start here:
-"What's the one thing in your role that took you the longest to figure
-out? The thing nobody told you when you started?"
+- When something sounds important: "That's really worth capturing — can you walk me through that step by step?"
 
 FOLLOW-UP STRATEGY:
 - If they mention a workaround → ask exactly how it works
@@ -31,11 +133,6 @@ FOLLOW-UP STRATEGY:
 - If they mention timing → ask how they know when to do it
 - If they mention a tool → ask what happens when it's unavailable
 - Ask about exceptions and edge cases — real knowledge lives here
-
-AFTER 8+ EXCHANGES — offer to wrap up:
-"I think we've captured some genuinely valuable things here. Want to
-go deeper on anything, or shall we wrap up and I'll turn this into
-knowledge articles for your team?"
 
 EXTRACT TOWARD THESE TOPICS:
 - Step-by-step processes with the non-obvious steps named
@@ -47,11 +144,13 @@ EXTRACT TOWARD THESE TOPICS:
 - What to do when things go wrong
 
 NEVER:
+- Ask about things already captured above
 - Ask generic questions like "describe your responsibilities"
 - Ask two questions in one message
 - Summarize everything back to them
 - Sound like a form or an interview
 `.trim();
+};
 
 /** Build the article generation prompt from a completed session conversation */
 export const buildArticleGenerationPrompt = (conversation, roleName) =>
@@ -337,6 +436,82 @@ export const answerFromContext = async (prompt) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
   const result = await model.generateContent(prompt);
   return result.response.text();
+};
+
+/** Check whether a Gemini explicit cache is still alive */
+export const isCacheValid = async (cacheId) => {
+  if (!cacheId) return false;
+  try {
+    await genAI.caches.get(cacheId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Create an explicit Gemini cache for a session system prompt — returns cache.name */
+export const createSessionCache = async (systemPrompt) => {
+  const cache = await genAI.caches.create({
+    model: "gemini-2.0-flash",
+    config: {
+      systemInstruction: systemPrompt,
+      ttl: "7200s",
+    },
+  });
+  return cache.name;
+};
+
+/**
+ * Send one message using a cached system prompt.
+ * history = array of { role: 'ai'|'employee', content: string }
+ */
+export const sendCachedMessage = async (cacheId, history, newMessage) => {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    cachedContent: cacheId,
+  });
+
+  let formattedHistory = history.map((msg) => ({
+    role: msg.role === "ai" ? "model" : "user",
+    parts: [{ text: msg.content }],
+  }));
+
+  const merged = [];
+  for (const turn of formattedHistory) {
+    if (merged.length > 0 && merged[merged.length - 1].role === turn.role) {
+      merged[merged.length - 1].parts[0].text += "\n" + turn.parts[0].text;
+    } else {
+      merged.push(turn);
+    }
+  }
+  formattedHistory = merged;
+
+  if (formattedHistory.length > 0 && formattedHistory[0].role === "model") {
+    formattedHistory = [
+      { role: "user", parts: [{ text: "begin" }] },
+      ...formattedHistory,
+    ];
+  }
+
+  const parseRetryDelay = (msg = "") => {
+    const match = msg.match(/retry in ([\d.]+)s/i);
+    return match ? Math.ceil(parseFloat(match[1])) * 1000 + 2000 : 35000;
+  };
+
+  const attempt = async () => {
+    const chat = model.startChat({ history: formattedHistory });
+    return (await chat.sendMessage(newMessage)).response.text();
+  };
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (err.status !== 429) throw err;
+    const delay = parseRetryDelay(err.message);
+    console.error(`[GEMINI] Rate limited — retrying in ${delay / 1000}s`);
+    await new Promise((r) => setTimeout(r, delay));
+    return await attempt();
+  }
 };
 
 /**

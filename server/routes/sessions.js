@@ -3,6 +3,10 @@ import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
 import {
   buildInterrogationSystemPrompt,
+  buildSessionContext,
+  createSessionCache,
+  isCacheValid,
+  sendCachedMessage,
   sendInterrogationMessage,
   buildArticleGenerationPrompt,
   generateArticles,
@@ -14,6 +18,35 @@ import {
 
 const router = Router();
 router.use(auth);
+
+// Fetch group name, build tiered context, build system prompt, create Gemini cache.
+// Returns { systemPrompt, cacheId } — cacheId is null if cache creation fails.
+const buildAndCachePrompt = async (employee, groupId) => {
+  const { data: group } = await supabase
+    .from("groups")
+    .select("name")
+    .eq("id", groupId)
+    .single();
+  const groupName = group?.name || "your team";
+  const context = await buildSessionContext(
+    groupId,
+    employee.job_title || "employee",
+    groupName,
+  );
+  const systemPrompt = buildInterrogationSystemPrompt(
+    employee.name,
+    employee.job_title || "employee",
+    groupName,
+    context,
+  );
+  let cacheId = null;
+  try {
+    cacheId = await createSessionCache(systemPrompt);
+  } catch (err) {
+    console.error("[SESSION] Cache creation failed:", err.message?.slice(0, 200));
+  }
+  return { systemPrompt, cacheId };
+};
 
 // POST /api/sessions — create session and generate AI opening message
 router.post("/", async (req, res, next) => {
@@ -34,12 +67,21 @@ router.post("/", async (req, res, next) => {
 
     if (sessionErr) throw sessionErr;
 
-    const systemPrompt = buildInterrogationSystemPrompt(
-      req.employee.name,
-      req.employee.job_title || "employee",
+    const { systemPrompt, cacheId } = await buildAndCachePrompt(
+      req.employee,
+      req.employee.group_id,
     );
 
-    const openingText = await sendInterrogationMessage(systemPrompt, [], "begin");
+    if (cacheId) {
+      await supabase
+        .from("interrogation_sessions")
+        .update({ gemini_cache_id: cacheId })
+        .eq("id", session.id);
+    }
+
+    const openingText = cacheId
+      ? await sendCachedMessage(cacheId, [], "begin")
+      : await sendInterrogationMessage(systemPrompt, [], "begin");
 
     const { data: openingMsg, error: msgErr } = await supabase
       .from("session_messages")
@@ -50,7 +92,7 @@ router.post("/", async (req, res, next) => {
     if (msgErr) throw msgErr;
 
     res.status(201).json({
-      data: { session, messages: [openingMsg] },
+      data: { session: { ...session, gemini_cache_id: cacheId }, messages: [openingMsg] },
       error: null,
       message: null,
     });
@@ -161,7 +203,7 @@ router.post("/:id/message", async (req, res, next) => {
 
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("id, status, group_id, employee_id, message_count, title, last_completion_message_id")
+      .select("id, status, group_id, employee_id, message_count, title, last_completion_message_id, gemini_cache_id")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -182,16 +224,29 @@ router.post("/:id/message", async (req, res, next) => {
 
     if (histErr) throw histErr;
 
-    const systemPrompt = buildInterrogationSystemPrompt(
-      req.employee.name,
-      req.employee.job_title || "employee",
-    );
+    // Resolve active cache — refresh if expired
+    let cacheId = session.gemini_cache_id;
+    if (cacheId) {
+      const valid = await isCacheValid(cacheId);
+      if (!valid) {
+        const rebuilt = await buildAndCachePrompt(req.employee, session.group_id);
+        cacheId = rebuilt.cacheId;
+        if (cacheId) {
+          await supabase
+            .from("interrogation_sessions")
+            .update({ gemini_cache_id: cacheId })
+            .eq("id", session.id);
+        }
+      }
+    }
 
-    const aiText = await sendInterrogationMessage(
-      systemPrompt,
-      history,
-      content.trim(),
-    );
+    const aiText = cacheId
+      ? await sendCachedMessage(cacheId, history, content.trim())
+      : await sendInterrogationMessage(
+          buildInterrogationSystemPrompt(req.employee.name, req.employee.job_title || "employee"),
+          history,
+          content.trim(),
+        );
 
     const { data: empMsg, error: empMsgErr } = await supabase
       .from("session_messages")
