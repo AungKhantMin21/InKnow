@@ -15,6 +15,7 @@ import AdminGroupDetail from "./pages/admin/AdminGroupDetail.jsx";
 import AdminEmployees from "./pages/admin/AdminEmployees.jsx";
 import AdminCoreKnowledge from "./pages/admin/AdminCoreKnowledge.jsx";
 import AdminStats from "./pages/admin/AdminStats.jsx";
+import JoinGroup from "./pages/JoinGroup.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -135,6 +136,7 @@ const AppRoutes = () => {
       <Route path="/admin/employees" element={<AdminRoute><AdminEmployees /></AdminRoute>} />
       <Route path="/admin/core-knowledge" element={<AdminRoute><AdminCoreKnowledge /></AdminRoute>} />
       <Route path="/admin/stats" element={<AdminRoute><AdminStats /></AdminRoute>} />
+      <Route path="/join/:token" element={<JoinGroup />} />
       <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
     </Routes>
   );
