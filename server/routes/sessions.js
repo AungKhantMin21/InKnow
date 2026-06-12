@@ -43,7 +43,10 @@ const buildAndCachePrompt = async (employee, groupId) => {
   try {
     cacheId = await createSessionCache(systemPrompt);
   } catch (err) {
-    console.error("[SESSION] Cache creation failed:", err.message?.slice(0, 200));
+    // "too small" is expected when there's no knowledge context yet — not an error
+    if (!err.message?.includes("too small")) {
+      console.error("[SESSION] Cache creation failed:", err.message?.slice(0, 200));
+    }
   }
   return { systemPrompt, cacheId };
 };
@@ -240,13 +243,24 @@ router.post("/:id/message", async (req, res, next) => {
       }
     }
 
-    const aiText = cacheId
-      ? await sendCachedMessage(cacheId, history, content.trim())
-      : await sendInterrogationMessage(
-          buildInterrogationSystemPrompt(req.employee.name, req.employee.job_title || "employee"),
-          history,
-          content.trim(),
-        );
+    let aiText;
+    if (cacheId) {
+      aiText = await sendCachedMessage(cacheId, history, content.trim());
+    } else {
+      // No cache — rebuild full context so knowledge is always injected.
+      // Also retries caching: once enough articles exist the cache will stick.
+      const { systemPrompt: freshPrompt, cacheId: freshCacheId } =
+        await buildAndCachePrompt(req.employee, session.group_id);
+      if (freshCacheId) {
+        await supabase
+          .from("interrogation_sessions")
+          .update({ gemini_cache_id: freshCacheId })
+          .eq("id", session.id);
+        aiText = await sendCachedMessage(freshCacheId, history, content.trim());
+      } else {
+        aiText = await sendInterrogationMessage(freshPrompt, history, content.trim());
+      }
+    }
 
     const { data: empMsg, error: empMsgErr } = await supabase
       .from("session_messages")
