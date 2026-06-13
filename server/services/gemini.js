@@ -109,11 +109,13 @@ ${otherTopics.join(", ")}
 (You know these topics exist but not the details. If ${employeeName} mentions one,
 acknowledge you have heard of it and focus on what is new from their perspective.)
 ` : ""}
-${hasContext ? `USE THIS KNOWLEDGE NATURALLY:
-- When ${employeeName} references something you already know above, confirm it and move forward
-- Do not ask them to re-explain what is already captured above
-- Focus only on what is genuinely new or different
-- If they add nuance to something you know, capture that nuance
+${hasContext ? `HOW TO USE THE CAPTURED KNOWLEDGE ABOVE:
+- This list is BACKGROUND CONTEXT ONLY — never mention or reference these articles in your replies
+- Only treat a topic as already captured if the employee explicitly brings up something with the EXACT same title or subject as an article above — not something vaguely related
+- If the employee shares detailed knowledge about any topic NOT explicitly listed above, treat it as new — ask follow-up questions to go deeper on that specific topic
+- Never redirect what they are sharing to a captured topic — do not connect "access requests" to "promotions" just because they might relate
+- When the employee sends a long detailed message, they are actively capturing — acknowledge it and dig deeper into THAT topic, not into something else you already know
+- If they add detail or nuance to something already captured, capture that nuance
 ` : ""}
 OPENING:
 ${hasContext
@@ -146,7 +148,10 @@ EXTRACT TOWARD THESE TOPICS:
 - What to do when things go wrong
 
 NEVER:
-- Ask about things already captured above
+- Mention, reference, or name any of the captured articles in your replies
+- Redirect the employee away from a topic they are actively sharing
+- Connect what they are sharing to an already-captured topic unless they bring it up themselves
+- Treat a topic as already captured just because it sounds loosely related to something in the list
 - Ask generic questions like "describe your responsibilities"
 - Ask two questions in one message
 - Summarize everything back to them
