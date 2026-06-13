@@ -503,7 +503,7 @@ const Session = () => {
                 {completing ? "Generating…" : "End session"}
               </button>
               {!isRich && !completing && (
-                <div className="absolute bottom-full right-0 mb-2 w-64 bg-ink text-surface font-body font-light text-xs px-3 py-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-ink text-surface font-body font-light text-xs px-3 py-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   More detail means richer articles — but you can end now if you're ready.
                 </div>
               )}
