@@ -12,6 +12,7 @@ import {
   listSessions,
   getSessionArticles,
 } from "../lib/api.js";
+import { isSessionRichEnough } from "../lib/session.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -486,15 +487,29 @@ const Session = () => {
             </span>
           </>
         )}
-        {(status === "active" || status === "re-opened") && employeeMessageCount >= 8 && (
-          <button
-            onClick={handleComplete}
-            disabled={completing || isTyping}
-            className="bg-ink text-surface font-body font-medium text-xs px-4 py-1.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50"
-          >
-            {completing ? "Generating…" : "End session"}
-          </button>
-        )}
+        {(status === "active" || status === "re-opened") && (() => {
+          const isRich = isSessionRichEnough(messages);
+          return (
+            <div className="relative group">
+              <button
+                onClick={handleComplete}
+                disabled={completing || isTyping}
+                className={`font-body font-medium text-xs px-4 py-1.5 tracking-wider uppercase transition-colors disabled:opacity-50 ${
+                  isRich
+                    ? "bg-ink text-surface hover:bg-ink-2"
+                    : "border border-rule bg-transparent text-ink-2 hover:bg-ground"
+                }`}
+              >
+                {completing ? "Generating…" : "End session"}
+              </button>
+              {!isRich && !completing && (
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-ink text-surface font-body font-light text-xs px-3 py-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  More detail means richer articles — but you can end now if you're ready.
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Body */}
