@@ -14,6 +14,7 @@ const AdminGroups = () => {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [archiving, setArchiving] = useState(null);
+  const [archiveConfirmId, setArchiveConfirmId] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -45,6 +46,7 @@ const AdminGroups = () => {
   };
 
   const handleArchive = async (group) => {
+    setArchiveConfirmId(null);
     setArchiving(group.id);
     try {
       await archiveGroup(group.id);
@@ -189,20 +191,43 @@ const AdminGroups = () => {
               </div>
 
               <div className="flex items-center gap-2 ml-6 flex-shrink-0">
-                <button
-                  onClick={() => navigate(`/admin/groups/${group.id}`, { state: { group } })}
-                  className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors"
-                >
-                  View
-                </button>
-                {!group.archived && (
-                  <button
-                    onClick={() => handleArchive(group)}
-                    disabled={archiving === group.id}
-                    className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors disabled:opacity-50"
-                  >
-                    {archiving === group.id ? "Archiving…" : "Archive"}
-                  </button>
+                {archiveConfirmId === group.id ? (
+                  <div className="flex items-center gap-3">
+                    <span className="font-body font-light text-xs text-ink-3">
+                      This will archive {group.name}. Can't undo.
+                    </span>
+                    <button
+                      onClick={() => handleArchive(group)}
+                      disabled={archiving === group.id}
+                      className="font-body font-medium text-xs px-3 py-1.5 tracking-wider uppercase transition-colors disabled:opacity-50"
+                      style={{ background: "var(--danger-light)", color: "var(--danger)" }}
+                    >
+                      {archiving === group.id ? "Archiving…" : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => setArchiveConfirmId(null)}
+                      className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => navigate(`/admin/groups/${group.id}`, { state: { group } })}
+                      className="border border-rule bg-transparent text-ink-2 font-body font-medium text-xs px-4 py-2 hover:bg-ground transition-colors"
+                    >
+                      View
+                    </button>
+                    {!group.archived && (
+                      <button
+                        onClick={() => setArchiveConfirmId(group.id)}
+                        className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+                      >
+                        Archive
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
