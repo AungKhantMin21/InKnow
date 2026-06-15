@@ -24,6 +24,7 @@ export const runCopilotAgent = async (jobId, payload) => {
   const { question, groupId, employeeId } = payload;
   const startTime = Date.now();
   const sources = [];
+  let maxSimilarity = 0;
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
   let toolCallsMade = 0;
@@ -76,12 +77,20 @@ export const runCopilotAgent = async (jobId, payload) => {
 
       const uniqueSources = [...new Map(sources.map((s) => [s.id, s])).values()];
 
+      const confidence = Math.round(maxSimilarity * 100);
+
       // Save the Q&A to copilot_queries so the feedback route can reference it.
       let queryId = null;
       try {
         const { data: queryRow } = await supabase
           .from("copilot_queries")
-          .insert({ employee_id: employeeId, group_id: groupId, question, answer: finalText })
+          .insert({
+            employee_id: employeeId,
+            question,
+            answer: finalText,
+            source_article_ids: uniqueSources.map((s) => s.id),
+            confidence_score: maxSimilarity,
+          })
           .select("id")
           .single();
         queryId = queryRow?.id ?? null;
@@ -102,11 +111,12 @@ export const runCopilotAgent = async (jobId, payload) => {
         answer: finalText,
         sources: uniqueSources,
         queryId,
+        confidence,
         agentSteps: steps,
         toolCallsMade,
       });
 
-      return { answer: finalText, sources: uniqueSources, queryId, agentSteps: steps, toolCallsMade };
+      return { answer: finalText, sources: uniqueSources, queryId, confidence, agentSteps: steps, toolCallsMade };
     }
 
     // ── Execute every tool call the model requested ───────────────────────────
@@ -124,6 +134,8 @@ export const runCopilotAgent = async (jobId, payload) => {
               groupId,
               args.threshold ?? 0.45,
             );
+            const highest = articles[0]?.similarity || 0;
+            if (highest > maxSimilarity) maxSimilarity = highest;
             toolOutput = {
               articles: articles.map((a) => ({
                 id: a.id,
@@ -132,7 +144,7 @@ export const runCopilotAgent = async (jobId, payload) => {
                 similarity: parseFloat((a.similarity || 0).toFixed(3)),
               })),
               count: articles.length,
-              highest_similarity: articles[0]?.similarity || 0,
+              highest_similarity: highest,
             };
           } catch {
             toolOutput = { articles: [], count: 0, highest_similarity: 0 };
@@ -143,7 +155,12 @@ export const runCopilotAgent = async (jobId, payload) => {
           if (!article) {
             toolOutput = { error: "Article not found or not accessible" };
           } else {
-            sources.push({ id: article.id, title: article.title });
+            sources.push({
+              id: article.id,
+              title: article.title,
+              captured_by_name: article.captured_by_name,
+              group_name: article.group_name,
+            });
             toolOutput = {
               id: article.id,
               title: article.title,
