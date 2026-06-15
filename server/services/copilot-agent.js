@@ -13,12 +13,14 @@ Your job: answer the employee's question using the company knowledge base.
 
 Rules:
 - Always search before answering — never answer from your own training data
-- If search results have similarity below 0.5, search again with a different query
-- Use get_article when a search result looks highly relevant and you need the full text
-- Only flag a gap after genuinely trying multiple search approaches
+- If search results have similarity below 0.45, search again with a different query
+- After searching, you MUST call get_article for the top result before composing any answer — summaries are not enough
+- If multiple results look relevant, call get_article for each of them
+- Never write a final answer until you have fetched at least one article's full content
+- Only flag a gap after genuinely trying multiple search approaches and finding nothing above 0.45
 - Cite your sources by referencing article titles in your answer
 - Be direct and specific — employees need actionable answers
-- Use ask_clarification at most once, only when the question is genuinely ambiguous`;
+- Use ask_clarification at most once, only when the question is genuinely ambiguous with no way to infer intent`;
 
 export const runCopilotAgent = async (jobId, payload) => {
   const { question, groupId, employeeId } = payload;
