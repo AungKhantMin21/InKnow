@@ -10,7 +10,9 @@ import managerRoutes from "./routes/manager.js";
 import groupsRoutes from "./routes/groups.js";
 import invitesRoutes from "./routes/invites.js";
 import adminRoutes from "./routes/admin.js";
+import jobsRoutes from "./routes/jobs.js";
 import errorHandler from "./middleware/errorHandler.js";
+import { startWorker } from "./workers/job-worker.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +32,7 @@ app.use("/api/manager", managerRoutes);
 app.use("/api/groups", groupsRoutes);
 app.use("/api/invites", invitesRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/jobs", jobsRoutes);
 
 app.use(errorHandler);
 
@@ -42,6 +45,8 @@ async function start() {
   }
 
   console.log(`DB connected — ${data.length} groups loaded`);
+
+  startWorker();
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
