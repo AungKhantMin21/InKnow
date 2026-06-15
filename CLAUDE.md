@@ -700,6 +700,7 @@ A feature is done when ALL of these are true:
 ✗ Use git add -A or git add . — always stage files explicitly by name
 ✗ Run git push — commit locally, never push
 ✗ Add "Co-authored-by" or any tool attribution to commit messages
+✗ Auto-commit without being asked — always present the test path first and wait
 ```
 
 ---
@@ -713,11 +714,10 @@ before moving on. No exceptions.
 
 ### What Is a Logical Unit
 
-Commit early and often. A logical unit is the smallest thing that works
-on its own and can be described in one sentence. Do not bundle unrelated
-work into one commit.
+A logical unit is the smallest thing that works on its own and can be
+described in one sentence. Do not bundle unrelated work into one commit.
 
-**Commit after each of these — not after an entire build order step:**
+**Report completion after each of these — not after an entire build order step:**
 
 ```
 One endpoint created or modified
@@ -843,15 +843,17 @@ Examples: `feat(auth)`, `fix(copilot)`, `style(session)`, `chore(db)`
 - Breaking changes: `BREAKING CHANGE: <description>` or append `!` after type
 
 ```
-COMMIT
+READY TO COMMIT
 
 git add [file1] [file2] [file3]
 git commit -m "<type>(<scope>): <description>" -m "<body>"
 ```
 
-**Run git add and git commit after every logical unit. Never git push.**
-Stage only the files for this logical unit — not everything in the working tree.
+**Do NOT run git add or git commit automatically.**
+Present the commit message and wait for explicit instruction to commit.
+When asked to commit, stage only the files for this logical unit.
 Never use git add -A or git add . — always stage files explicitly by name.
+Never git push.
 
 ---
 
@@ -890,14 +892,14 @@ buildInterrogationSystemPrompt
 
 COMMIT MESSAGE
 
-Add POST /api/sessions endpoint with Gemini opening message
+feat(sessions): add POST /api/sessions with Gemini opening message
 
 Creates a new interrogation session for the authenticated employee,
 generates the AI's opening question using the role-specific system
 prompt, and saves both the session and the first message to the
 database. Session status defaults to active on creation.
 
-COMMIT
+READY TO COMMIT — say "commit" to run:
 
 git add server/routes/sessions.js server/services/gemini.js
 git commit -m "feat(sessions): add POST /api/sessions with Gemini opening message" -m "Creates a new interrogation session for the authenticated employee and generates the AI's opening question using the role-specific system prompt. Both the session record and the first AI message are persisted to the database on creation."
@@ -936,14 +938,14 @@ src/components/ui/AIAvatar.jsx — created
 
 COMMIT MESSAGE
 
-Add AIAvatar component with diamond pulse animation
+feat(ui): add AIAvatar component with diamond pulse animation
 
 Implements the AI presence indicator used throughout the chat interface.
 Renders a volt-colored rotated square that morphs continuously using
 the diamondPulse keyframe, chosen to suggest intelligence and attention
 without any generic AI iconography.
 
-COMMIT
+READY TO COMMIT — say "commit" to run:
 
 git add src/components/ui/AIAvatar.jsx
 git commit -m "feat(ui): add AIAvatar component with diamond pulse animation" -m "Implements the AI presence indicator used throughout the chat interface. Renders a volt-colored diamond that morphs continuously using the diamondPulse keyframe, chosen to suggest intelligence and attention without relying on generic AI iconography."
@@ -977,8 +979,8 @@ Staying on Build Order step [number].
 **When the session ends:**
 
 ```
-Before stopping — run the three end-of-implementation steps:
+Before stopping — present the three end-of-implementation steps:
 1. How to test
 2. Files changed
-3. Commit message
+3. Commit message (READY TO COMMIT — do not run until asked)
 ```
