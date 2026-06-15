@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import supabase from "../db/supabase.js";
 import { streamToken, streamComplete, streamError } from "../workers/job-worker.js";
 import { COPILOT_TOOLS } from "./copilot-tools.js";
 import { retrieveArticles, getArticleById, flagGap } from "./rag.js";
@@ -73,6 +74,21 @@ export const runCopilotAgent = async (jobId, payload) => {
         await new Promise((r) => setTimeout(r, 20));
       }
 
+      const uniqueSources = [...new Map(sources.map((s) => [s.id, s])).values()];
+
+      // Save the Q&A to copilot_queries so the feedback route can reference it.
+      let queryId = null;
+      try {
+        const { data: queryRow } = await supabase
+          .from("copilot_queries")
+          .insert({ employee_id: employeeId, group_id: groupId, question, answer: finalText })
+          .select("id")
+          .single();
+        queryId = queryRow?.id ?? null;
+      } catch {
+        // non-fatal — feedback won't be linkable but the answer still reaches the user
+      }
+
       await logLLMCall({
         id: llmCallId,
         promptTokens: totalPromptTokens,
@@ -84,12 +100,13 @@ export const runCopilotAgent = async (jobId, payload) => {
 
       streamComplete(jobId, {
         answer: finalText,
-        sources: [...new Set(sources)],
+        sources: uniqueSources,
+        queryId,
         agentSteps: steps,
         toolCallsMade,
       });
 
-      return { answer: finalText, sources, agentSteps: steps };
+      return { answer: finalText, sources: uniqueSources, agentSteps: steps };
     }
 
     // ── Execute every tool call the model requested ───────────────────────────
@@ -126,7 +143,7 @@ export const runCopilotAgent = async (jobId, payload) => {
           if (!article) {
             toolOutput = { error: "Article not found or not accessible" };
           } else {
-            sources.push(article.title);
+            sources.push({ id: article.id, title: article.title });
             toolOutput = {
               id: article.id,
               title: article.title,
