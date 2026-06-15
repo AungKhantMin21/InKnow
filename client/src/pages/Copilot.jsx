@@ -14,13 +14,30 @@ const stripSources = (text) =>
     .join("\n")
     .trim();
 
-const SourceTag = ({ title }) => (
-  <span
-    className="inline-flex items-center font-mono text-[9px] tracking-wider px-2 py-1 mr-2 mb-1"
-    style={{ color: "var(--forest)", background: "var(--forest-light)" }}
-  >
-    {title}
-  </span>
+const SourceTag = ({ title, group_name, captured_by_name }) => {
+  const parts = [title, group_name, captured_by_name].filter(Boolean);
+  return (
+    <span
+      className="inline-flex items-center font-mono text-[9px] tracking-wider px-2 py-1 mr-2 mb-1"
+      style={{ color: "var(--forest)", background: "var(--forest-light)" }}
+    >
+      {parts.join(" · ")}
+    </span>
+  );
+};
+
+const ConfidenceBar = ({ confidence }) => (
+  <div className="flex items-center gap-3 mt-4">
+    <div className="flex-1 bg-rule" style={{ height: 1.5 }}>
+      <div
+        className="bg-ink h-full transition-all duration-500"
+        style={{ width: `${Math.min(confidence, 100)}%` }}
+      />
+    </div>
+    <span className="font-mono text-[9px] tracking-wider text-ink-4 flex-shrink-0">
+      {confidence}% confidence
+    </span>
+  </div>
 );
 
 const FeedbackRow = ({ queryId, currentFeedback, onFeedback }) => {
@@ -120,10 +137,17 @@ const AnswerCard = ({ item, onFeedback }) => (
         {item.sources.length > 0 && (
           <div className="mt-4">
             {item.sources.map((s, i) => (
-              <SourceTag key={i} title={s.title || s} />
+              <SourceTag
+                key={i}
+                title={s.title || s}
+                group_name={s.group_name}
+                captured_by_name={s.captured_by_name}
+              />
             ))}
           </div>
         )}
+
+        <ConfidenceBar confidence={item.confidence ?? 0} />
 
         <FeedbackRow
           queryId={item.queryId}
@@ -215,6 +239,7 @@ const Copilot = () => {
         answer: complete.clarification || complete.answer || null,
         sources: complete.sources || [],
         queryId: complete.queryId || null,
+        confidence: complete.confidence ?? 0,
         feedback: null,
       },
     ]);
