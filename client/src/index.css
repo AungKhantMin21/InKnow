@@ -103,6 +103,11 @@ h4 {
   50%       { opacity: 0.45; }
 }
 
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
 @keyframes typingDot {
   0%, 60%, 100% {
     transform: translateY(0);
