@@ -68,12 +68,19 @@ export const runCopilotAgent = async (jobId, payload) => {
       totalCompletionTokens += response.usageMetadata.candidatesTokenCount || 0;
     }
 
-    const parts = response.candidates[0].content.parts;
+    // Gemini occasionally returns undefined content (safety filter, transient error).
+    // Default to [] so the loop doesn't crash — the empty-finalText guard below catches it.
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
     const toolCalls = parts.filter((p) => p.functionCall);
 
     // ── No tool calls = model is ready to answer ─────────────────────────────
     if (toolCalls.length === 0) {
       const finalText = parts.find((p) => p.text)?.text || "";
+
+      if (!finalText) {
+        streamError(jobId, "The AI is taking too long — try again.");
+        return;
+      }
 
       // Stream the answer word by word so the UI can render it progressively.
       // 20ms per word on a 100-word answer = ~2s of visible streaming.
