@@ -1,4 +1,5 @@
 import supabase from "../db/supabase.js";
+import { runCopilotAgent } from "../services/copilot-agent.js";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -97,9 +98,8 @@ const pollJobs = async () => {
 // Add cases here as each step is implemented.
 const dispatchJob = async (job) => {
   switch (job.type) {
-    // Step 03 — copilot agent
-    // case "copilot_query":
-    //   return runCopilotAgent(job.id, job.payload);
+    case "copilot_query":
+      return runCopilotAgent(job.id, job.payload);
 
     // Step 05 — inno agent
     // case "inno_message":

@@ -1,59 +1,12 @@
 import { Router } from "express";
 import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
-import { enrichWithNames } from "../services/rag.js";
-import { generateEmbedding } from "../services/embeddings.js";
-import { expandQuery, buildCopilotPrompt, answerFromContext } from "../services/gemini.js";
 
 const router = Router();
 router.use(auth);
 
-const detectQuestionType = (question) => {
-  const q = question.toLowerCase().trim();
-  const broad = [
-    // Explicit synthesis / explanation requests
-    /\b(explain|describe|summarize|summarise)\b/,
-    /\btell me (about|everything|all)\b/,
-    /\bwalk me through\b/,
-    /\bgive me (an? )?(overview|breakdown|rundown|summary)\b/,
-    /\beverything (about|related|i need)\b/,
-    // How a system works — not "how do I do X"
-    /\bhow does .+(work|function|operate)\b/,
-    /\bhow (is|are) .+(done|handled|managed|run|structured|organized)\b/,
-    /\bhow (do|can|should) (i|we) (approach|handle|manage|deal with)\b/,
-    // Process / policy questions
-    /\bwhat (is|are) the (process|procedure|workflow|policy|policies|guidelines?|rules?|requirements?|steps)\b/,
-    /\b(full|complete|entire|end.to.end) (process|guide|breakdown|overview|flow)\b/,
-    // Enumeration
-    /\bwhat are (all|the different|the main|the key|the various)\b/,
-    /\blist (all|the|every)\b/,
-    // Comparison
-    /\b(difference|differences) between\b/,
-    /\bcompare\b/,
-    // General guidance
-    /\bbest practices\b/,
-    /\bguidelines? for\b/,
-  ];
-  return broad.some((p) => p.test(q)) ? "broad" : "specific";
-};
-
-const calculateConfidence = (articles) => {
-  if (!articles.length) return 0;
-  return Math.min(100, Math.round(articles[0].similarity * 100));
-};
-
-const parseCitedSources = (answerText, articles) =>
-  articles.filter((a) =>
-    answerText.toLowerCase().includes(a.title.toLowerCase()),
-  );
-
-// TODO: chunked embeddings — articles currently stored
-// as single vectors. Broad questions suffer because
-// dense articles average across all topics.
-// Next improvement: chunk articles at ~150 words
-// with 30-word overlap, embed each chunk separately.
-
-// POST /api/copilot/query — expand query, embed variants, retrieve and merge, generate answer
+// POST /api/copilot/query — queue a copilot job, return jobId immediately.
+// The client connects to GET /api/jobs/:jobId/stream to receive the streamed answer.
 router.post("/query", async (req, res, next) => {
   try {
     const { question } = req.body;
@@ -66,108 +19,24 @@ router.post("/query", async (req, res, next) => {
       });
     }
 
-    const q = question.trim();
-    const questionType = detectQuestionType(q);
-    const matchCount = questionType === "broad" ? 7 : 3;
-    const matchThreshold = questionType === "broad" ? 0.35 : 0.4;
-
-    // Expand query into multiple variants for broader retrieval coverage
-    const queries = await expandQuery(q);
-
-    // Embed all query variants in parallel
-    const embeddings = await Promise.all(queries.map((qv) => generateEmbedding(qv)));
-
-    // Search with each embedding in parallel — scoped to own group + public
-    const allResults = await Promise.all(
-      embeddings.map((embedding) =>
-        supabase.rpc("match_articles", {
-          query_embedding: embedding,
-          match_threshold: matchThreshold,
-          match_count: matchCount,
-          requesting_group: req.employee.group_id || null,
-        }),
-      ),
-    );
-
-    // Merge and deduplicate — keep highest similarity per article
-    const seen = new Map();
-    for (const { data, error } of allResults) {
-      if (error || !data) continue;
-      for (const article of data) {
-        const existing = seen.get(article.id);
-        if (!existing || article.similarity > existing.similarity) {
-          seen.set(article.id, article);
-        }
-      }
-    }
-
-    // Sort by similarity descending, cap at matchCount
-    const rawArticles = Array.from(seen.values())
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, matchCount);
-
-    const articles = await enrichWithNames(rawArticles);
-
-    let answer = null;
-    let confidence = 0;
-
-    if (articles.length > 0) {
-      const prompt = buildCopilotPrompt(q, articles, questionType);
-      answer = await answerFromContext(prompt);
-      confidence = calculateConfidence(articles);
-    }
-
-    // Gemini may return gap language even when articles were retrieved —
-    // it means the retrieved articles weren't relevant enough to answer.
-    // Normalise those cases to a true gap state so the client renders
-    // the gap UI rather than a low-confidence "answer" with sources.
-    const GAP_PHRASES = [
-      "nobody in your group has captured",
-      "nobody has captured",
-      "nobody's captured",
-      "nobody captured",
-      "may exist in another team's private",
-      "don't have access to it",
-    ];
-    const isGap = !answer || GAP_PHRASES.some((p) => answer.toLowerCase().includes(p));
-    if (isGap) {
-      answer = null;
-      confidence = 0;
-    }
-
-    const cited = isGap ? [] : parseCitedSources(answer, articles);
-    const sources = cited.map((a) => ({
-      id: a.id,
-      title: a.title,
-      captured_by_name: a.captured_by_name,
-      created_at: a.created_at,
-      similarity: a.similarity,
-    }));
-
-    const { data: saved, error: saveErr } = await supabase
-      .from("copilot_queries")
+    const { data: job, error } = await supabase
+      .from("jobs")
       .insert({
+        type: "copilot_query",
+        payload: {
+          question: question.trim(),
+          groupId: req.employee.group_id,
+          employeeId: req.employee.id,
+        },
         employee_id: req.employee.id,
-        question: q,
-        answer,
-        source_article_ids: articles.map((a) => a.id),
-        confidence_score: confidence,
+        status: "pending",
       })
       .select("id")
       .single();
 
-    if (saveErr) console.error("[COPILOT] Failed to save query:", saveErr.message);
+    if (error) throw error;
 
-    res.json({
-      data: {
-        answer,
-        sources,
-        confidence,
-        query_id: saved?.id ?? null,
-      },
-      error: null,
-      message: null,
-    });
+    res.json({ data: { jobId: job.id }, error: null, message: null });
   } catch (err) {
     next(err);
   }

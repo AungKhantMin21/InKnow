@@ -24,19 +24,48 @@ export const enrichWithNames = async (matches) => {
 };
 
 /**
- * Embeds the question, runs vector similarity search, and returns
- * matching articles enriched with capturer name and similarity score.
+ * Embed a query and run a group-scoped vector similarity search.
+ * Returns raw article matches (no name enrichment) so the caller
+ * can decide how much content to load.
  */
-export const retrieveArticles = async (question, matchCount = 3) => {
-  const embedding = await generateEmbedding(question);
+export const retrieveArticles = async (query, groupId, threshold = 0.45) => {
+  const embedding = await generateEmbedding(query);
 
-  const { data: matches, error } = await supabase.rpc("match_articles", {
+  const { data, error } = await supabase.rpc("match_articles", {
     query_embedding: embedding,
-    match_threshold: 0.4,
-    match_count: matchCount,
+    match_threshold: threshold,
+    match_count: 5,
+    requesting_group: groupId || null,
   });
 
   if (error) throw error;
+  return data || [];
+};
 
-  return enrichWithNames(matches);
+/** Fetch a single article by ID, enforcing group privacy boundary. */
+export const getArticleById = async (articleId, groupId) => {
+  const { data, error } = await supabase
+    .from("knowledge_articles")
+    .select("id, title, content, visibility, group_id")
+    .eq("id", articleId)
+    .eq("approved", true)
+    .eq("rejected", false)
+    .single();
+
+  if (error || !data) return null;
+
+  // Only return the article if it belongs to the requesting group or is public.
+  if (data.group_id === groupId || data.visibility === "public") return data;
+  return null;
+};
+
+/** Write a knowledge gap record for manager review. */
+export const flagGap = async ({ topic, originalQuestion, employeeId, groupId }) => {
+  await supabase.from("knowledge_gaps").insert({
+    topic,
+    original_question: originalQuestion,
+    employee_id: employeeId,
+    group_id: groupId,
+    status: "open",
+  });
 };
