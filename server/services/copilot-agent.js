@@ -106,7 +106,7 @@ export const runCopilotAgent = async (jobId, payload) => {
         toolCallsMade,
       });
 
-      return { answer: finalText, sources: uniqueSources, agentSteps: steps };
+      return { answer: finalText, sources: uniqueSources, queryId, agentSteps: steps, toolCallsMade };
     }
 
     // ── Execute every tool call the model requested ───────────────────────────

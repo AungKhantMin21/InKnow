@@ -39,14 +39,29 @@ router.get("/:jobId/stream", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no"); // prevents nginx from buffering the stream
   res.flushHeaders();
 
-  // Send a keepalive comment every 15s so the connection survives proxy timeouts.
-  // SSE comments (lines starting with :) are ignored by the browser.
-  const keepalive = setInterval(() => {
-    res.write(": keepalive\n\n");
-  }, 15000);
+  const keepalive = setInterval(() => res.write(": keepalive\n\n"), 15000);
+  let pollFallback;
 
-  // Race condition guard: the worker may finish before the client connects to the stream.
-  // Check the job's current state first and resolve immediately if already done.
+  // closeAndSend is the single exit path for this SSE connection.
+  // The res.writableEnded guard prevents a double-send if the worker's
+  // streamComplete and the fallback poller fire at almost the same moment.
+  const closeAndSend = (event) => {
+    if (res.writableEnded) return;
+    clearInterval(keepalive);
+    clearInterval(pollFallback);
+    unregisterSSEClient(jobId);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+    res.end();
+  };
+
+  // Register the SSE client BEFORE querying the DB.
+  // If we checked the DB first and got "pending", then the worker completed
+  // between that check and registerSSEClient, streamComplete would find no
+  // client and the browser would hang forever. Registering first closes
+  // that window: the worker will either find us in the map and stream directly,
+  // or the DB check below will catch a status that was already "completed".
+  registerSSEClient(jobId, res);
+
   const { data: job } = await supabase
     .from("jobs")
     .select("status, result, error")
@@ -54,24 +69,32 @@ router.get("/:jobId/stream", async (req, res) => {
     .single();
 
   if (job?.status === "completed") {
-    res.write(`data: ${JSON.stringify({ type: "complete", result: job.result })}\n\n`);
-    clearInterval(keepalive);
-    res.end();
+    closeAndSend({ type: "complete", result: job.result });
     return;
   }
-
   if (job?.status === "failed") {
-    res.write(`data: ${JSON.stringify({ type: "error", error: job.error })}\n\n`);
-    clearInterval(keepalive);
-    res.end();
+    closeAndSend({ type: "error", error: job.error });
     return;
   }
 
-  // Job still in progress — register this response so the worker can stream to it.
-  registerSSEClient(jobId, res);
+  // Fallback poller: catches the narrow window where the worker calls streamComplete
+  // after our DB check above but before it writes the DB update to "completed".
+  // In the happy path the worker streams directly to this res and closes it;
+  // req.close fires and clears this interval before it ever runs twice.
+  pollFallback = setInterval(async () => {
+    if (res.writableEnded) { clearInterval(pollFallback); return; }
+    const { data: s } = await supabase
+      .from("jobs")
+      .select("status, result, error")
+      .eq("id", jobId)
+      .single();
+    if (s?.status === "completed") closeAndSend({ type: "complete", result: s.result });
+    else if (s?.status === "failed") closeAndSend({ type: "error", error: s.error });
+  }, 2000);
 
   req.on("close", () => {
     clearInterval(keepalive);
+    clearInterval(pollFallback);
     unregisterSSEClient(jobId);
   });
 });
