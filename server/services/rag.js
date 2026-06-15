@@ -42,11 +42,12 @@ export const retrieveArticles = async (query, groupId, threshold = 0.45) => {
   return data || [];
 };
 
-/** Fetch a single article by ID, enforcing group privacy boundary. */
+/** Fetch a single article by ID, enforcing group privacy boundary.
+ *  Returns enriched object with captured_by_name and group_name. */
 export const getArticleById = async (articleId, groupId) => {
   const { data, error } = await supabase
     .from("knowledge_articles")
-    .select("id, title, content, visibility, group_id")
+    .select("id, title, content, visibility, group_id, captured_by")
     .eq("id", articleId)
     .eq("approved", true)
     .eq("rejected", false)
@@ -54,9 +55,24 @@ export const getArticleById = async (articleId, groupId) => {
 
   if (error || !data) return null;
 
-  // Only return the article if it belongs to the requesting group or is public.
-  if (data.group_id === groupId || data.visibility === "public") return data;
-  return null;
+  if (data.group_id !== groupId && data.visibility !== "public") return null;
+
+  const [employeeRes, groupRes] = await Promise.all([
+    data.captured_by
+      ? supabase.from("employees").select("name").eq("id", data.captured_by).single()
+      : Promise.resolve({ data: null }),
+    data.group_id
+      ? supabase.from("groups").select("name").eq("id", data.group_id).single()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  return {
+    id: data.id,
+    title: data.title,
+    content: data.content,
+    captured_by_name: employeeRes.data?.name || "Unknown",
+    group_name: groupRes.data?.name || null,
+  };
 };
 
 /** Write a knowledge gap record for manager review. */
