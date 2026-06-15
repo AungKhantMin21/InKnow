@@ -52,6 +52,7 @@ export const runCopilotAgent = async (jobId, payload) => {
     tools: [{ functionDeclarations: COPILOT_TOOLS }],
     toolConfig: { functionCallingConfig: { mode: "AUTO" } },
     systemInstruction: SYSTEM_INSTRUCTION,
+    generationConfig: { temperature: 0.3 },
   });
 
   const chat = model.startChat();
