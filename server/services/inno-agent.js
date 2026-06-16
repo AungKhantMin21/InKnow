@@ -7,8 +7,6 @@ import {
   isCacheValid,
   sendCachedMessage,
   sendInterrogationMessage,
-  generateProvisionalTitle,
-  formatConversation,
 } from "./gemini.js";
 
 /** Rebuild the Gemini cache for a session and persist the new cache id. */
@@ -147,19 +145,12 @@ export const runInnoMessage = async (jobId, payload) => {
     .eq("id", sessionId);
 
   if (newCount === 6 && !session.title) {
-    supabase
-      .from("session_messages")
-      .select("role, content")
-      .eq("session_id", sessionId)
-      .order("created_at", { ascending: true })
-      .then(({ data: allMsgs }) => generateProvisionalTitle(formatConversation(allMsgs || [])))
-      .then((title) =>
-        supabase
-          .from("interrogation_sessions")
-          .update({ title, title_generated_at: new Date().toISOString() })
-          .eq("id", sessionId),
-      )
-      .catch(() => {});
+    await supabase.from("jobs").insert({
+      type: "title_gen",
+      payload: { sessionId },
+      employee_id: payload.employeeId,
+      session_id: sessionId,
+    });
   }
 
   // Stream response token by token, then signal completion
