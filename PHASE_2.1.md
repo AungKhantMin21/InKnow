@@ -310,6 +310,10 @@ export const startWorker = () => {
 
 ```sql
 -- Run in Supabase SQL editor
+-- Also claims jobs stuck in 'processing' for >2 minutes (server crash recovery).
+-- The 2-minute timeout restarts on each claim via started_at = now().
+-- Combined with retry_count/max_retries in processJob, genuinely failing jobs
+-- exhaust after 3 attempts; crashed jobs get a clean retry.
 CREATE OR REPLACE FUNCTION claim_next_job()
 RETURNS SETOF jobs
 LANGUAGE sql
@@ -319,6 +323,10 @@ AS $$
   WHERE id IN (
     SELECT id FROM jobs
     WHERE status = 'pending'
+       OR (
+         status = 'processing'
+         AND started_at < now() - interval '2 minutes'
+       )
     ORDER BY created_at ASC
     LIMIT 5
     FOR UPDATE SKIP LOCKED
