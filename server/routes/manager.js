@@ -134,4 +134,32 @@ router.get("/pending", async (req, res, next) => {
   }
 });
 
+/** GET /api/manager/gaps — open knowledge gaps for the manager's own group */
+router.get("/gaps", async (req, res, next) => {
+  try {
+    const { data: gaps, error } = await supabase
+      .from("knowledge_gaps")
+      .select("id, topic, original_question, status, created_at, employee_id, employees(name)")
+      .eq("group_id", req.employee.group_id)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    const enriched = (gaps || []).map((g) => ({
+      id: g.id,
+      topic: g.topic,
+      original_question: g.original_question,
+      status: g.status,
+      created_at: g.created_at,
+      employee_name: g.employees?.name || "Unknown",
+    }));
+
+    res.json({ data: { gaps: enriched }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

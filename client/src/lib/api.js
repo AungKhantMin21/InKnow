@@ -76,4 +76,13 @@ export const setArticleVisibility = (id, visibility) =>
 export const setArticleCore = (id, is_core) =>
   api.patch(`/api/knowledge/${id}/core`, { is_core });
 
+// Admin observability
+export const getLLMUsage = (days = 30) =>
+  api.get(`/api/admin/llm-usage?days=${days}`);
+export const getAdminGaps = () => api.get("/api/admin/gaps");
+export const getAgentTraces = (jobId) => api.get(`/api/admin/agent-traces/${jobId}`);
+
+// Manager gaps
+export const getManagerGaps = () => api.get("/api/manager/gaps");
+
 export default api;

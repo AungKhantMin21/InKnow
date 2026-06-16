@@ -143,4 +143,132 @@ router.patch("/employees/:id/role", async (req, res, next) => {
   }
 });
 
+/** GET /api/admin/llm-usage — token counts and estimated cost by group and by day */
+router.get("/llm-usage", async (req, res, next) => {
+  try {
+    const { days = 30 } = req.query;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: rows, error } = await supabase
+      .from("llm_calls")
+      .select("group_id, model, prompt_tokens, completion_tokens, cached_tokens, created_at, groups(name)")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Rough Gemini cost estimate: $0.10/1M input, $0.40/1M output, $0.025/1M cached
+    const estimateCost = (prompt, completion, cached) =>
+      ((prompt || 0) / 1_000_000) * 0.10 +
+      ((completion || 0) / 1_000_000) * 0.40 +
+      ((cached || 0) / 1_000_000) * 0.025;
+
+    // Aggregate by group
+    const groupMap = {};
+    for (const r of rows || []) {
+      const key = r.group_id || "none";
+      if (!groupMap[key]) {
+        groupMap[key] = {
+          group_id: r.group_id,
+          group_name: r.groups?.name || "Unknown",
+          total_calls: 0,
+          total_prompt_tokens: 0,
+          total_completion_tokens: 0,
+          estimated_cost_usd: 0,
+        };
+      }
+      groupMap[key].total_calls++;
+      groupMap[key].total_prompt_tokens += r.prompt_tokens || 0;
+      groupMap[key].total_completion_tokens += r.completion_tokens || 0;
+      groupMap[key].estimated_cost_usd += estimateCost(r.prompt_tokens, r.completion_tokens, r.cached_tokens);
+    }
+
+    // Aggregate by day
+    const dayMap = {};
+    for (const r of rows || []) {
+      const day = r.created_at.slice(0, 10);
+      if (!dayMap[day]) {
+        dayMap[day] = { date: day, total_calls: 0, total_prompt_tokens: 0, total_completion_tokens: 0, estimated_cost_usd: 0 };
+      }
+      dayMap[day].total_calls++;
+      dayMap[day].total_prompt_tokens += r.prompt_tokens || 0;
+      dayMap[day].total_completion_tokens += r.completion_tokens || 0;
+      dayMap[day].estimated_cost_usd += estimateCost(r.prompt_tokens, r.completion_tokens, r.cached_tokens);
+    }
+
+    const by_group = Object.values(groupMap).map((g) => ({
+      ...g,
+      estimated_cost_usd: parseFloat(g.estimated_cost_usd.toFixed(4)),
+    }));
+    const by_day = Object.values(dayMap)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((d) => ({ ...d, estimated_cost_usd: parseFloat(d.estimated_cost_usd.toFixed(4)) }));
+
+    res.json({
+      data: { by_group, by_day, total_calls: (rows || []).length },
+      error: null,
+      message: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/admin/gaps — all open knowledge gaps with employee and group info */
+router.get("/gaps", async (req, res, next) => {
+  try {
+    const { data: gaps, error } = await supabase
+      .from("knowledge_gaps")
+      .select("id, topic, original_question, status, created_at, employee_id, group_id, employees(name), groups(name)")
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    const enriched = (gaps || []).map((g) => ({
+      id: g.id,
+      topic: g.topic,
+      original_question: g.original_question,
+      status: g.status,
+      created_at: g.created_at,
+      employee_name: g.employees?.name || "Unknown",
+      group_name: g.groups?.name || "Unknown",
+    }));
+
+    res.json({ data: { gaps: enriched }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /api/admin/agent-traces/:jobId — tool call log for a specific job */
+router.get("/agent-traces/:jobId", async (req, res, next) => {
+  try {
+    const { data: llmCall, error: callErr } = await supabase
+      .from("llm_calls")
+      .select("*")
+      .eq("job_id", req.params.jobId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (callErr || !llmCall) {
+      return res.json({ data: { llm_call: null, tool_calls: [] }, error: null, message: null });
+    }
+
+    const { data: toolCalls, error: toolErr } = await supabase
+      .from("agent_tool_calls")
+      .select("*")
+      .eq("llm_call_id", llmCall.id)
+      .order("step", { ascending: true });
+
+    if (toolErr) throw toolErr;
+
+    res.json({ data: { llm_call: llmCall, tool_calls: toolCalls || [] }, error: null, message: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
