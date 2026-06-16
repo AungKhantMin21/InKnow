@@ -6,6 +6,8 @@ const ADMIN_NAV = [
   { label: "Employees", path: "/admin/employees" },
   { label: "Core Knowledge", path: "/admin/core-knowledge" },
   { label: "Stats", path: "/admin/stats" },
+  { label: "Usage", path: "/admin/usage" },
+  { label: "Gaps", path: "/admin/gaps" },
 ];
 
 const AdminLayout = ({ children }) => {
