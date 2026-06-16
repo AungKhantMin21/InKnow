@@ -8,6 +8,7 @@ import {
   getPendingArticles,
   approveArticle,
   rejectArticle,
+  getManagerGaps,
 } from "../lib/api.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -182,6 +183,7 @@ const Manager = () => {
   const [stats, setStats]     = useState(null);
   const [coverage, setCoverage] = useState([]);
   const [pending, setPending]   = useState([]);
+  const [gaps, setGaps]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [actioning, setActioning] = useState({});
@@ -198,14 +200,16 @@ const Manager = () => {
     setLoading(true);
     setError(null);
     try {
-      const [statsRes, coverageRes, pendingRes] = await Promise.all([
+      const [statsRes, coverageRes, pendingRes, gapsRes] = await Promise.all([
         getManagerStats(),
         getManagerCoverage(),
         getPendingArticles(),
+        getManagerGaps(),
       ]);
       setStats(statsRes.data.data);
       setCoverage(coverageRes.data.data.coverage);
       setPending(pendingRes.data.data.articles);
+      setGaps(gapsRes.data.data.gaps);
     } catch {
       setError("Something went wrong — try again.");
     } finally {
@@ -329,6 +333,49 @@ const Manager = () => {
               ))}
             </div>
           )}
+
+          {/* Knowledge gaps */}
+          <div className="mt-12">
+            <SectionLabel>Knowledge gaps</SectionLabel>
+            {loading ? (
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="bg-white border border-rule px-5 py-4 space-y-2">
+                    <div className="bg-ground h-3 w-48 rounded-sm" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+                    <div className="bg-ground h-2.5 w-full rounded-sm" style={{ animation: "skeletonPulse 1.5s ease infinite" }} />
+                  </div>
+                ))}
+              </div>
+            ) : gaps.length === 0 ? (
+              <div className="bg-white border border-rule px-6 py-10 text-center">
+                <p className="font-body font-light text-sm text-ink-3">
+                  No open gaps — knowledge base is complete.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {gaps.map((gap) => (
+                  <div key={gap.id} className="bg-white border border-rule px-5 py-4">
+                    <p className="font-body font-medium text-sm text-ink">{gap.topic}</p>
+                    {gap.original_question && (
+                      <p className="font-body font-light text-sm text-ink-3 mt-1 line-clamp-2">
+                        "{gap.original_question}"
+                      </p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-ink-4">
+                        {gap.employee_name}
+                      </span>
+                      <span className="w-px h-3 bg-rule" />
+                      <span className="font-mono text-[9px] tracking-[0.14em] uppercase text-ink-4">
+                        {new Date(gap.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
         </div>
       </div>
