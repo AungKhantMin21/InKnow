@@ -1,7 +1,10 @@
 import supabase from "../db/supabase.js";
 import { runCopilotAgent } from "../services/copilot-agent.js";
 
-const POLL_INTERVAL_MS = 2000;
+// When a job is found, poll again quickly to catch any burst of new jobs.
+// When idle, back off to avoid hammering Supabase with empty queries.
+const POLL_ACTIVE_MS = 500;
+const POLL_IDLE_MS = 3000;
 
 // Maps jobId → active SSE response object.
 // When a client connects to GET /api/jobs/:id/stream, their res is stored here.
@@ -77,20 +80,24 @@ const processJob = async (job) => {
   }
 };
 
+// Returns true if jobs were found so the scheduler knows to poll again quickly.
 const pollJobs = async () => {
   try {
     const { data: jobs, error } = await supabase.rpc("claim_next_job");
     if (error) {
       console.error("[worker] poll error:", error.message);
-      return;
+      return false;
     }
     if (jobs?.length > 0) {
       // processJob is intentionally not awaited — each job runs independently.
       // Errors are caught inside processJob and written back to the jobs table.
       jobs.forEach((job) => processJob(job));
+      return true;
     }
+    return false;
   } catch (err) {
     console.error("[worker] unexpected poll error:", err.message);
+    return false;
   }
 };
 
@@ -115,7 +122,14 @@ const dispatchJob = async (job) => {
   }
 };
 
+// Adaptive scheduler: polls quickly after finding work, slowly when idle.
+// Uses recursive setTimeout so the interval can change each cycle.
+const scheduleNextPoll = async () => {
+  const hadJobs = await pollJobs();
+  setTimeout(scheduleNextPoll, hadJobs ? POLL_ACTIVE_MS : POLL_IDLE_MS);
+};
+
 export const startWorker = () => {
-  console.log("[worker] started, polling every", POLL_INTERVAL_MS, "ms");
-  setInterval(pollJobs, POLL_INTERVAL_MS);
+  console.log("[worker] started — adaptive polling (active: 500ms, idle: 3s)");
+  scheduleNextPoll();
 };
