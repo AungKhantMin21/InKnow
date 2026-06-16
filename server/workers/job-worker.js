@@ -1,6 +1,7 @@
 import supabase from "../db/supabase.js";
 import { runCopilotAgent } from "../services/copilot-agent.js";
 import { runInnoMessage } from "../services/inno-agent.js";
+import { embedArticle, scoreArticle, generateTitle } from "../services/background-jobs.js";
 
 // When a job is found, poll again quickly to catch any burst of new jobs.
 // When idle, back off to avoid hammering Supabase with empty queries.
@@ -124,10 +125,14 @@ const dispatchJob = async (job) => {
     case "inno_message":
       return runInnoMessage(job.id, job.payload);
 
-    // Step 06 — background tasks
-    // case "embed_article":
-    // case "quality_score":
-    // case "title_gen":
+    case "embed_article":
+      return embedArticle(job.payload.articleId);
+
+    case "quality_score":
+      return scoreArticle(job.payload.articleId);
+
+    case "title_gen":
+      return generateTitle(job.payload.sessionId);
 
     default:
       throw new Error(`Unknown job type: ${job.type}`);

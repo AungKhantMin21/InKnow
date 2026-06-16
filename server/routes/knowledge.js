@@ -1,12 +1,11 @@
 import { Router } from "express";
 import supabase from "../db/supabase.js";
 import auth from "../middleware/auth.js";
-import { generateEmbedding } from "../services/embeddings.js";
 
 const router = Router();
 router.use(auth);
 
-// POST /api/knowledge — save a reviewed article with its embedding
+// POST /api/knowledge — save a reviewed article, queue embedding async
 router.post("/", async (req, res, next) => {
   try {
     const { session_id, title, summary, content, tags } = req.body;
@@ -19,9 +18,6 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const embeddingText = [title, summary, content].filter(Boolean).join(" ");
-    const embedding = await generateEmbedding(embeddingText);
-
     const { data: article, error } = await supabase
       .from("knowledge_articles")
       .insert({
@@ -33,12 +29,17 @@ router.post("/", async (req, res, next) => {
         tags: tags || [],
         approved: false,
         captured_by: req.employee.id,
-        embedding,
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    await supabase.from("jobs").insert({
+      type: "embed_article",
+      payload: { articleId: article.id },
+      employee_id: req.employee.id,
+    });
 
     res.status(201).json({ data: { article }, error: null, message: null });
   } catch (err) {
@@ -209,8 +210,6 @@ router.post("/update", async (req, res, next) => {
     }
 
     const newTitle = title?.trim() || current.title;
-    const embeddingText = [newTitle, current.summary, content.trim()].filter(Boolean).join(" ");
-    const embedding = await generateEmbedding(embeddingText);
 
     const { data: updated, error: updateErr } = await supabase
       .from("knowledge_articles")
@@ -224,7 +223,7 @@ router.post("/update", async (req, res, next) => {
         approved: false,
         approved_by: null,
         approved_at: null,
-        embedding,
+        embedding: null,
         updated_at: new Date().toISOString(),
         updated_from_session_id: session_id || null,
       })
@@ -233,6 +232,12 @@ router.post("/update", async (req, res, next) => {
       .single();
 
     if (updateErr) throw updateErr;
+
+    await supabase.from("jobs").insert({
+      type: "embed_article",
+      payload: { articleId: article_id },
+      employee_id: req.employee.id,
+    });
 
     res.json({ data: { article: updated }, error: null, message: null });
   } catch (err) {
@@ -270,6 +275,12 @@ router.patch("/:id/approve", async (req, res, next) => {
         message: "We couldn't find that. Try going back.",
       });
     }
+
+    await supabase.from("jobs").insert({
+      type: "quality_score",
+      payload: { articleId: article.id },
+      employee_id: req.employee.id,
+    });
 
     res.json({ data: { article }, error: null, message: null });
   } catch (err) {
