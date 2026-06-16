@@ -472,6 +472,34 @@ Common rules:
   any article that was retrieved but not used in the answer)
 `.trim();
 
+/** Score a knowledge article's quality — returns 0.0–1.0 */
+export const scoreArticleQuality = async (title, content) => {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const result = await model.generateContent(`
+Rate the quality of this internal knowledge article on a scale from 0.0 to 1.0.
+
+TITLE: ${title}
+
+CONTENT:
+${content}
+
+Criteria:
+- Specificity: does it name real steps, people, systems, or timings? (not generic advice)
+- Completeness: does it cover enough to be actionable without needing to ask someone?
+- Clarity: is it easy to follow for a new employee?
+
+Score 0.8–1.0: highly specific, complete, immediately actionable
+Score 0.5–0.79: useful but missing some detail or specificity
+Score 0.0–0.49: too vague, too short, or not actionable
+
+Return only a number between 0.0 and 1.0. Nothing else.
+`.trim());
+  const text = result.response.text().trim();
+  const score = parseFloat(text);
+  if (isNaN(score)) return null;
+  return Math.min(1, Math.max(0, score));
+};
+
 /** Answer a copilot question from retrieved article context */
 export const answerFromContext = async (prompt) => {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
