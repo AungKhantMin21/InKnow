@@ -1,5 +1,6 @@
 import supabase from "../db/supabase.js";
 import { runCopilotAgent } from "../services/copilot-agent.js";
+import { runInnoMessage } from "../services/inno-agent.js";
 
 // When a job is found, poll again quickly to catch any burst of new jobs.
 // When idle, back off to avoid hammering Supabase with empty queries.
@@ -46,9 +47,21 @@ const processJob = async (job) => {
   console.log(`[worker] processing job ${job.id} type=${job.type}`);
 
   try {
-    // Handlers are added here incrementally across Steps 03, 05, and 06.
-    // Each case sets result and breaks; the success update below runs after.
     const result = await dispatchJob(job);
+
+    // undefined means the agent called streamError and returned early without a result.
+    // Mark as failed so the SSE fallback poller sends an error event, not null result.
+    if (result === undefined) {
+      await supabase
+        .from("jobs")
+        .update({
+          status: "failed",
+          error: "Agent returned no result",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", job.id);
+      return;
+    }
 
     await supabase
       .from("jobs")
@@ -108,9 +121,8 @@ const dispatchJob = async (job) => {
     case "copilot_query":
       return runCopilotAgent(job.id, job.payload);
 
-    // Step 05 — inno agent
-    // case "inno_message":
-    //   return runInnoMessage(job.id, job.payload);
+    case "inno_message":
+      return runInnoMessage(job.id, job.payload);
 
     // Step 06 — background tasks
     // case "embed_article":

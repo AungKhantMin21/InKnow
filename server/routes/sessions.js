@@ -5,13 +5,11 @@ import {
   buildInterrogationSystemPrompt,
   buildSessionContext,
   createSessionCache,
-  isCacheValid,
   sendCachedMessage,
   sendInterrogationMessage,
   buildArticleGenerationPrompt,
   generateArticles,
   generateSessionTitle,
-  generateProvisionalTitle,
   runKnowledgeDiff,
   formatConversation,
 } from "../services/gemini.js";
@@ -192,7 +190,7 @@ router.get("/:id/articles", async (req, res, next) => {
   }
 });
 
-// POST /api/sessions/:id/message — send employee message, get AI response
+// POST /api/sessions/:id/message — save employee message, queue inno_message job
 router.post("/:id/message", async (req, res, next) => {
   try {
     const { content } = req.body;
@@ -206,7 +204,7 @@ router.post("/:id/message", async (req, res, next) => {
 
     const { data: session, error: sessionErr } = await supabase
       .from("interrogation_sessions")
-      .select("id, status, group_id, employee_id, message_count, title, last_completion_message_id, gemini_cache_id")
+      .select("id, status, group_id, employee_id, message_count")
       .eq("id", req.params.id)
       .eq("employee_id", req.employee.id)
       .single();
@@ -219,49 +217,7 @@ router.post("/:id/message", async (req, res, next) => {
       });
     }
 
-    const { data: history, error: histErr } = await supabase
-      .from("session_messages")
-      .select("role, content")
-      .eq("session_id", session.id)
-      .order("created_at", { ascending: true });
-
-    if (histErr) throw histErr;
-
-    // Resolve active cache — refresh if expired
-    let cacheId = session.gemini_cache_id;
-    if (cacheId) {
-      const valid = await isCacheValid(cacheId);
-      if (!valid) {
-        const rebuilt = await buildAndCachePrompt(req.employee, session.group_id);
-        cacheId = rebuilt.cacheId;
-        if (cacheId) {
-          await supabase
-            .from("interrogation_sessions")
-            .update({ gemini_cache_id: cacheId })
-            .eq("id", session.id);
-        }
-      }
-    }
-
-    let aiText;
-    if (cacheId) {
-      aiText = await sendCachedMessage(cacheId, history, content.trim());
-    } else {
-      // No cache — rebuild full context so knowledge is always injected.
-      // Also retries caching: once enough articles exist the cache will stick.
-      const { systemPrompt: freshPrompt, cacheId: freshCacheId } =
-        await buildAndCachePrompt(req.employee, session.group_id);
-      if (freshCacheId) {
-        await supabase
-          .from("interrogation_sessions")
-          .update({ gemini_cache_id: freshCacheId })
-          .eq("id", session.id);
-        aiText = await sendCachedMessage(freshCacheId, history, content.trim());
-      } else {
-        aiText = await sendInterrogationMessage(freshPrompt, history, content.trim());
-      }
-    }
-
+    // Save employee message to DB immediately — agent picks it up from history
     const { data: empMsg, error: empMsgErr } = await supabase
       .from("session_messages")
       .insert({ session_id: session.id, role: "employee", content: content.trim() })
@@ -270,50 +226,43 @@ router.post("/:id/message", async (req, res, next) => {
 
     if (empMsgErr) throw empMsgErr;
 
-    const { data: aiMsg, error: aiMsgErr } = await supabase
-      .from("session_messages")
-      .insert({ session_id: session.id, role: "ai", content: aiText })
-      .select()
-      .single();
-
-    if (aiMsgErr) throw aiMsgErr;
-
-    // Track message count and flip completed → re-opened
-    const newCount = (session.message_count || 0) + 2;
+    // Track message count and flip completed → re-opened synchronously
+    const newCount = (session.message_count || 0) + 1;
     const sessionUpdates = { message_count: newCount };
-    if (session.status === "completed") {
-      sessionUpdates.status = "re-opened";
-    }
+    if (session.status === "completed") sessionUpdates.status = "re-opened";
 
     await supabase
       .from("interrogation_sessions")
       .update(sessionUpdates)
       .eq("id", session.id);
 
-    // Fire-and-forget provisional title after 3 exchanges (6 messages)
-    if (newCount === 6 && !session.title) {
-      supabase
-        .from("session_messages")
-        .select("role, content")
-        .eq("session_id", session.id)
-        .order("created_at", { ascending: true })
-        .then(({ data: allMsgs }) => {
-          const conversation = formatConversation(allMsgs || []);
-          return generateProvisionalTitle(conversation);
-        })
-        .then((title) => {
-          supabase
-            .from("interrogation_sessions")
-            .update({ title, title_generated_at: new Date().toISOString() })
-            .eq("id", session.id);
-        })
-        .catch(() => {});
-    }
+    // Queue the AI response — agent handles caching, tool calls, and DB write
+    const { data: job, error: jobErr } = await supabase
+      .from("jobs")
+      .insert({
+        type: "inno_message",
+        payload: {
+          sessionId: session.id,
+          employeeMessage: content.trim(),
+          groupId: session.group_id,
+          employeeId: req.employee.id,
+          employeeName: req.employee.name,
+          jobTitle: req.employee.job_title,
+        },
+        employee_id: req.employee.id,
+        session_id: session.id,
+      })
+      .select("id")
+      .single();
 
-    const updatedStatus = sessionUpdates.status || session.status;
+    if (jobErr) throw jobErr;
 
     res.json({
-      data: { employeeMessage: empMsg, aiMessage: aiMsg, sessionStatus: updatedStatus },
+      data: {
+        jobId: job.id,
+        employeeMessage: empMsg,
+        sessionStatus: sessionUpdates.status || session.status,
+      },
       error: null,
       message: null,
     });

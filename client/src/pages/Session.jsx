@@ -13,6 +13,7 @@ import {
   getSessionArticles,
 } from "../lib/api.js";
 import { isSessionRichEnough } from "../lib/session.js";
+import { useJobStream } from "../hooks/useJobStream.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,7 @@ const Session = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState(null);
+  const [wrapUpNudge, setWrapUpNudge] = useState(false);
   const [nothingNew, setNothingNew] = useState(location.state?.nothingNew || false);
   const [initializing, setInitializing] = useState(true);
   const [guardSession, setGuardSession] = useState(null);
@@ -194,6 +196,14 @@ const Session = () => {
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  const {
+    streaming,
+    complete: streamComplete,
+    error: streamError,
+    startStream,
+    reset: resetStream,
+  } = useJobStream();
 
   // Auto-scroll
   useEffect(() => {
@@ -206,6 +216,43 @@ const Session = () => {
     const t = setTimeout(() => setNothingNew(false), 5000);
     return () => clearTimeout(t);
   }, [nothingNew]);
+
+  // When the inno stream completes, add AI message and detect wrap_up intent
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!streamComplete) return;
+    const { message, intent } = streamComplete;
+    setMessages((prev) => [
+      ...prev,
+      { id: `ai-${Date.now()}`, role: "ai", content: message },
+    ]);
+    if (intent === "wrap_up") setWrapUpNudge(true);
+    setIsTyping(false);
+    resetStream();
+    inputRef.current?.focus();
+  }, [streamComplete]);
+
+  // Surface stream-level errors
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!streamError) return;
+    setError(streamError);
+    setIsTyping(false);
+    resetStream();
+    inputRef.current?.focus();
+  }, [streamError]);
+
+  // Safety net: streaming ended with no complete or error (agent returned undefined).
+  // Unblock the UI so the typing indicator doesn't stick forever.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (streaming || streamComplete || streamError) return;
+    if (!isTyping) return;
+    setError("Something went wrong — try again.");
+    setIsTyping(false);
+    resetStream();
+    inputRef.current?.focus();
+  }, [streaming]);
 
   // Load session articles whenever session changes to completed/re-opened
   const loadSessionArticles = (sessionId) => {
@@ -288,6 +335,7 @@ const Session = () => {
     if (!text?.trim() || isTyping) return;
     setIsTyping(true);
     setError(null);
+    setWrapUpNudge(false);
 
     const optimistic = { id: `opt-${Date.now()}`, role: "employee", content: text };
     setMessages((prev) => [...prev, optimistic]);
@@ -299,10 +347,10 @@ const Session = () => {
 
     try {
       const { data } = await sendMessage(id, text);
+      // Replace optimistic with the real DB-persisted employee message
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== optimistic.id),
         data.data.employeeMessage,
-        data.data.aiMessage,
       ]);
 
       // If backend flipped to re-opened, update session state
@@ -310,10 +358,12 @@ const Session = () => {
         setSession((prev) => ({ ...prev, status: data.data.sessionStatus }));
         loadSessionArticles(id);
       }
+
+      // Stream the AI response — isTyping stays true until stream completes
+      startStream(data.data.jobId);
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setError("The AI is taking too long — try again.");
-    } finally {
       setIsTyping(false);
       inputRef.current?.focus();
     }
@@ -535,6 +585,33 @@ const Session = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Wrap-up nudge — appears when Inno signals intent: wrap_up */}
+          {wrapUpNudge && status !== "completed" && (
+            <div
+              className="border-t px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0"
+              style={{ background: "var(--volt-light)", borderColor: "rgba(45,78,255,0.18)" }}
+            >
+              <p className="font-body font-light text-sm" style={{ color: "var(--volt)" }}>
+                Inno thinks we've covered a lot — ready to wrap up?
+              </p>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button
+                  onClick={handleComplete}
+                  disabled={completing || isTyping}
+                  className="bg-ink text-surface font-body font-medium text-xs px-4 py-1.5 tracking-wider uppercase hover:bg-ink-2 transition-colors disabled:opacity-50"
+                >
+                  {completing ? "Generating…" : "End session"}
+                </button>
+                <button
+                  onClick={() => setWrapUpNudge(false)}
+                  className="font-body font-medium text-xs text-ink-3 hover:text-ink transition-colors"
+                >
+                  Keep going
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Input bar (active / re-opened) */}
           {status !== "completed" && (
