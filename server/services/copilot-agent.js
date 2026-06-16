@@ -84,11 +84,11 @@ export const runCopilotAgent = async (jobId, payload) => {
       }
 
       // Stream the answer word by word so the UI can render it progressively.
-      // 20ms per word on a 100-word answer = ~2s of visible streaming.
+      // 5ms per word keeps streaming visible without adding noticeable latency.
       const words = finalText.split(" ");
       for (const word of words) {
         streamToken(jobId, word + " ");
-        await new Promise((r) => setTimeout(r, 20));
+        await new Promise((r) => setTimeout(r, 5));
       }
 
       const uniqueSources = [...new Map(sources.map((s) => [s.id, s])).values()];
