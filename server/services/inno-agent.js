@@ -47,17 +47,22 @@ const rebuildCache = async (sessionId, groupId, employeeName, jobTitle) => {
 
 /**
  * Detect conversational intent from the AI response text.
- * The system prompt writes a very specific closing message on wrap-up —
- * we detect it here so the frontend can show the end-session nudge.
+ * Fires on both the wrap-up OFFER (named topic summary) and the closing confirmation,
+ * so the frontend nudge appears as soon as Inno suggests wrapping up.
  */
 const detectIntent = (message) => {
   const lower = message.toLowerCase();
   if (
+    // Wrap-up offer: "I have captured: topic A, topic B..."
+    lower.includes("i have captured:") ||
+    lower.includes("i've captured:") ||
+    // Wrap-up offer: "ready to turn these into articles"
+    lower.includes("ready to turn these into articles") ||
+    lower.includes("turn these into articles for the team") ||
+    // Closing message (after employee confirms)
     lower.includes("end session button") ||
-    lower.includes("click the end") ||
     lower.includes("go ahead and click") ||
-    lower.includes("knowledge articles for your team") ||
-    lower.includes("wrap up")
+    lower.includes("knowledge articles for your team")
   ) {
     return "wrap_up";
   }
