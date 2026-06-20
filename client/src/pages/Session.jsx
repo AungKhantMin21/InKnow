@@ -36,18 +36,27 @@ const formatDate = (iso) =>
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-const TypingIndicator = () => (
-  <div className="flex items-start gap-3">
+const TypingIndicator = ({ tokens }) => (
+  <div className="flex items-start gap-3" style={{ animation: "messageIn 300ms ease both" }}>
     <AIAvatar size={28} />
-    <div className="bg-ground border border-rule px-4 py-3 flex items-center gap-1.5"
-      style={{ borderRadius: "0 10px 10px 10px" }}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="block w-1.5 h-1.5 rounded-full bg-ink-3"
-          style={{ animation: "typingDot 1.2s ease infinite", animationDelay: `${i * 0.2}s` }}
-        />
-      ))}
+    <div
+      className="max-w-[75%] bg-ground border border-rule px-4 py-3 font-body font-light text-sm leading-relaxed text-ink"
+      style={{ borderRadius: "0 10px 10px 10px" }}
+    >
+      {tokens ? (
+        <span>{tokens}</span>
+      ) : (
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-[10px] tracking-wider text-ink-3">Inno is thinking</span>
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="block w-1 h-1 rounded-full bg-ink-3"
+              style={{ animation: "typingDot 1.2s ease infinite", animationDelay: `${i * 0.2}s` }}
+            />
+          ))}
+        </span>
+      )}
     </div>
   </div>
 );
@@ -199,6 +208,7 @@ const Session = () => {
 
   const {
     streaming,
+    tokens: streamTokens,
     complete: streamComplete,
     error: streamError,
     startStream,
@@ -577,7 +587,7 @@ const Session = () => {
                   )}
               </>
             ))}
-            {isTyping && <TypingIndicator />}
+            {isTyping && <TypingIndicator tokens={streamTokens} />}
             {error && session && (
               <p className="font-body text-xs text-center" style={{ color: "var(--danger)" }}>
                 {error}
