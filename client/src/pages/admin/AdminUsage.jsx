@@ -175,6 +175,44 @@ export default function AdminUsage() {
             }
           </div>
         </div>
+
+        {/* Recent agent calls */}
+        <div className="mt-10">
+          <SectionLabel>Recent Agent Calls</SectionLabel>
+
+          <div className="bg-white border border-rule">
+            <div className="grid border-b border-rule px-5 py-2.5" style={{ gridTemplateColumns: "130px 1fr 80px 80px 80px" }}>
+              {["Time", "Type", "Steps", "Tools", "Latency"].map((h) => (
+                <span key={h} className="font-mono text-[9px] tracking-[0.18em] uppercase text-ink-4">{h}</span>
+              ))}
+            </div>
+
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="px-5"><SkeletonRow /></div>
+                ))
+              : !data?.recent_calls?.length
+              ? (
+                <div className="px-5 py-10 text-center">
+                  <p className="font-body font-light text-sm text-ink-4">No agent calls yet.</p>
+                </div>
+              )
+              : data.recent_calls.map((c) => (
+                  <div
+                    key={c.id}
+                    className="grid px-5 py-3 border-b border-rule last:border-0"
+                    style={{ gridTemplateColumns: "130px 1fr 80px 80px 80px" }}
+                  >
+                    <span className="font-mono text-[10px] text-ink-4">{new Date(c.created_at).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="font-mono text-[10px] text-ink-3">{c.call_type} · {c.group_name}</span>
+                    <span className="font-mono text-xs text-ink-2">{c.agent_steps}</span>
+                    <span className="font-mono text-xs text-ink-2">{c.tool_calls_made}</span>
+                    <span className="font-mono text-xs text-ink-3">{c.latency_ms ? `${(c.latency_ms / 1000).toFixed(1)}s` : "—"}</span>
+                  </div>
+                ))
+            }
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );

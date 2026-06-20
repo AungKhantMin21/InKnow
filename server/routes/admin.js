@@ -151,7 +151,7 @@ router.get("/llm-usage", async (req, res, next) => {
 
     const { data: rows, error } = await supabase
       .from("llm_calls")
-      .select("group_id, model, prompt_tokens, completion_tokens, cached_tokens, created_at, groups(name)")
+      .select("id, group_id, call_type, model, prompt_tokens, completion_tokens, cached_tokens, agent_steps, tool_calls_made, latency_ms, created_at, groups(name)")
       .gte("created_at", since)
       .order("created_at", { ascending: false });
 
@@ -204,8 +204,18 @@ router.get("/llm-usage", async (req, res, next) => {
       .sort((a, b) => b.date.localeCompare(a.date))
       .map((d) => ({ ...d, estimated_cost_usd: parseFloat(d.estimated_cost_usd.toFixed(4)) }));
 
+    const recent_calls = (rows || []).slice(0, 20).map((r) => ({
+      id: r.id,
+      call_type: r.call_type,
+      group_name: r.groups?.name || "Unknown",
+      agent_steps: r.agent_steps || 1,
+      tool_calls_made: r.tool_calls_made || 0,
+      latency_ms: r.latency_ms || 0,
+      created_at: r.created_at,
+    }));
+
     res.json({
-      data: { by_group, by_day, total_calls: (rows || []).length },
+      data: { by_group, by_day, recent_calls, total_calls: (rows || []).length },
       error: null,
       message: null,
     });
