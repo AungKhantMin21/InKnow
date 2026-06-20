@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.jsx";
+import { getManagerGaps } from "../../lib/api.js";
 
 const isActive = (path, location) => {
   if (path === "/sessions") {
@@ -65,10 +67,18 @@ const buildRoleLabel = (user) => {
 const Sidebar = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [gapCount, setGapCount] = useState(0);
 
   const hasGroup = !!user?.group_id;
   const isManager = !!(user?.is_manager && user?.group_id);
   const isAdmin = !!user?.is_admin;
+
+  useEffect(() => {
+    if (!isManager) return;
+    getManagerGaps()
+      .then((res) => setGapCount(res.data?.data?.gaps?.length || 0))
+      .catch(() => {});
+  }, [isManager]);
 
   const handleLogout = () => {
     logout();
@@ -97,7 +107,19 @@ const Sidebar = () => {
 
         {isManager && (
           <SidebarSection label="My Group">
-            <NavItem path="/manager">Manager</NavItem>
+            <NavItem path="/manager">
+              <span className="flex items-center gap-2 w-full">
+                Manager
+                {gapCount > 0 && (
+                  <span
+                    className="font-mono text-[8px] text-surface px-1.5 py-0.5 flex-shrink-0"
+                    style={{ background: "var(--danger)", borderRadius: 2 }}
+                  >
+                    {gapCount}
+                  </span>
+                )}
+              </span>
+            </NavItem>
           </SidebarSection>
         )}
 
