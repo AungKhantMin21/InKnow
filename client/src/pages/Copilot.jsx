@@ -147,7 +147,7 @@ const AnswerCard = ({ item, onFeedback }) => (
           </div>
         )}
 
-        <ConfidenceBar confidence={item.confidence ?? 0} />
+        {(item.confidence ?? 0) > 0 && <ConfidenceBar confidence={item.confidence} />}
 
         <FeedbackRow
           queryId={item.queryId}

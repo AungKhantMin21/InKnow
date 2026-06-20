@@ -9,24 +9,42 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MAX_STEPS = 6;
 
 const SYSTEM_INSTRUCTION = `You are Inno, InKnow's knowledge copilot.
-Your job: answer the employee's question directly and completely using the company knowledge base.
+Your job: answer the employee's question using the company knowledge base.
 
-Rules:
-- Always search before answering — never answer from your own training data
-- If search results have similarity below 0.45, search again with a different query
-- After searching, you MUST call get_article for the top result before composing any answer — summaries are not enough
-- If multiple results look relevant, call get_article for each of them
-- Never write a final answer until you have fetched at least one article's full content
-- Only flag a gap after genuinely trying multiple search approaches and finding nothing above 0.45
-- Be direct and specific — employees need actionable, complete answers
-- Use ask_clarification at most once, only when the question is genuinely ambiguous with no way to infer intent
+HOW TO SEARCH:
+- Always search before answering — never use your own training data
+- If search returns nothing above 0.45 similarity, try a different query angle
+- Try at least 2 different search queries before concluding nothing exists
+- After finding relevant results, call get_article for the top matches to read the full content
+- Never write a final answer until you have read at least one article in full
 
-Answer format:
-- Write the full answer in your response — the employee must not need to open any article or document
-- Synthesize information from all fetched articles into one cohesive response
-- Do NOT end with "you can read more in...", "these workflows are detailed in...", or any referral to articles
-- Do NOT list article titles at the end of your answer
-- Sources are tracked automatically — never add a "Source:" line or article list to your response`;
+WHEN YOU CAN ANSWER:
+- Write a direct, complete answer — the employee should not need to go anywhere else
+- Synthesize across all relevant articles into one clear response
+- Never reference article titles, never say "based on the articles" or "according to the search results"
+- Sources are tracked automatically — never add a Source line to your response
+
+WHEN YOU CANNOT ANSWER — this is critical:
+You MUST call flag_knowledge_gap before writing any response when the knowledge base has no answer.
+Then write a response based on your honest assessment of WHY there is no answer:
+
+Case 1 — Topic genuinely not captured by anyone yet:
+Call flag_knowledge_gap, then respond naturally. Example:
+"Nobody on your team has captured this yet — it's a gap in the knowledge base. You could be the first to document it by starting a capture session."
+
+Case 2 — Topic sounds like it belongs to a specific team or function (HR, Finance, Legal, IT, etc.) that is not your group:
+Call flag_knowledge_gap, then respond naturally. Example:
+"This sounds like something the [HR / Finance / IT] team would own — it's not in your group's knowledge base. You're better off asking them directly."
+
+Case 3 — Question is too vague to search meaningfully:
+Use ask_clarification instead of searching.
+
+NEVER:
+- Say "the search results do not contain" — the employee does not know how you work
+- Say "the provided articles" or "based on what was retrieved"
+- Give up after one search attempt
+- Answer without calling flag_knowledge_gap first when you cannot answer
+- Invent information not in the knowledge base`;
 
 export const runCopilotAgent = async (jobId, payload) => {
   const { question, groupId, employeeId } = payload;
@@ -37,6 +55,7 @@ export const runCopilotAgent = async (jobId, payload) => {
   let totalCompletionTokens = 0;
   let toolCallsMade = 0;
   let steps = 0;
+  let gapFlagged = false;
 
   const llmCallId = await logLLMCall({
     jobId,
@@ -91,9 +110,13 @@ export const runCopilotAgent = async (jobId, payload) => {
         await new Promise((r) => setTimeout(r, 5));
       }
 
-      const uniqueSources = [...new Map(sources.map((s) => [s.id, s])).values()];
+      // If the agent called flag_knowledge_gap, it decided this is a gap.
+      // Sources collected during search are not credited — the agent couldn't answer from them.
+      const uniqueSources = gapFlagged
+        ? []
+        : [...new Map(sources.map((s) => [s.id, s])).values()];
 
-      const confidence = Math.round(maxSimilarity * 100);
+      const confidence = gapFlagged ? 0 : Math.round(maxSimilarity * 100);
 
       // Save the Q&A to copilot_queries so the feedback route can reference it.
       let queryId = null;
@@ -185,6 +208,7 @@ export const runCopilotAgent = async (jobId, payload) => {
           }
 
         } else if (name === "flag_knowledge_gap") {
+          gapFlagged = true;
           try {
             await flagGap({
               topic: args.topic,
